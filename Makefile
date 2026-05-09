@@ -1,5 +1,5 @@
 .POSIX:
-.PHONY: all compile test clean purge
+.PHONY: all compile test lint clean purge
 .SUFFIXES: .el .elc
 
 RM = rm -f
@@ -7,7 +7,7 @@ EMACS = emacs
 SRC = autosync-git.el
 BYTEC = $(SRC)c
 
-DEPS := cl-lib
+DEPS := cl-lib package-lint
 
 PKGCACHE := $(abspath $(PWD)/package-cache)
 
@@ -15,7 +15,8 @@ PKGCACHE := $(abspath $(PWD)/package-cache)
 # Copyrights: Steve Purcell (https://github.com/purcell)
 INIT_PACKAGES="(progn \
   (require 'package) \
-  (setq package-user-dir \"$(PKGCACHE)\") \
+  (setq package-user-dir \"$(PKGCACHE)\" \
+        package-check-signature nil) \
   (push '(\"nongnu\" . \"https://elpa.nongnu.org/nongnu/\") package-archives) \
   (push '(\"gnu\" . \"https://elpa.gnu.org/packages/\") package-archives) \
   (package-initialize) \
@@ -39,6 +40,13 @@ test: $(BYTEC)
 		-L . \
 		-l autosync-git-tests.el \
 		-f ert-run-tests-batch-and-exit
+
+lint: $(SRC)
+	@echo "Linting $<"
+	$(BATCH) \
+		-L . \
+		--eval "(require 'package-lint)" \
+		-f package-lint-batch-and-exit $<
 
 purge: clean
 	$(RM) -r $(PKGCACHE)

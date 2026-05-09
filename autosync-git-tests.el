@@ -585,6 +585,25 @@ synchronously calls the done callback with exit code 0."
       (autosync-git-mode)
       (should autosync-git-mode))))
 
+(ert-deftest autosync-git-mode--interactive-bypasses-dir-locals ()
+  "Interactive activation (M-x) bypasses the dir-locals claim check.
+Emacs sets `this-command' to the command symbol when running a
+command interactively; the mode treats that as the bypass signal."
+  (cl-letf (((symbol-value 'call-recorder) nil)
+            ((symbol-value 'autosync-git--sync-alist) nil)
+            ((symbol-value 'autosync-git-pull-timer) 123)
+            ((symbol-function 'autosync-git--toplevel) (always-return "/dir"))
+            ((symbol-function 'autosync-git--dir-locals-claims-mode-p)
+             (lambda (&rest _) (error "Should not be called for interactive activation")))
+            ((symbol-function 'autosync-git--pull-on-timer) (record-calls-and-return t))
+            ((symbol-function 'autosync-git--pull-when-visiting) (record-calls-and-return t))
+            ((symbol-function 'add-hook)  (record-calls-and-return t))
+            ((symbol-function 'remove-hook)  (record-calls-and-return t)))
+    (with-temp-buffer
+      (let ((this-command 'autosync-git-mode))
+        (autosync-git-mode 1))
+      (should autosync-git-mode))))
+
 ;;;; Timer-exists helper:
 
 (ert-deftest autosync-git--timer-exists--no-timer ()

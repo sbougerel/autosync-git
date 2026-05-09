@@ -25,8 +25,5 @@ jobs:
       - uses: purcell/setup-emacs@master
         with:
           version: ${{ matrix.emacs_version }}
+      - run: make lint
       - run: make test
-      - uses: leotaku/elisp-check@master
-        with:
-          check: melpa
-          file: autosync-git.el

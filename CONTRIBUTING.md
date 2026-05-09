@@ -16,6 +16,12 @@ This bootstraps a local package cache under `package-cache/` on first run.
 
 Tests run against the `EMACS` binary in your `PATH`. Override with `make test EMACS=/path/to/emacs`. CI runs the suite against the Emacs versions listed in `.github/workflows/makefile.yml`.
 
+## Linting
+
+    make lint
+
+Runs `package-lint` against `autosync-git.el`. The package must stay lint-clean: CI runs the same command on every push.
+
 ## Cleaning
 
     make clean    # remove byte-compiled output
@@ -25,7 +31,7 @@ Tests run against the `EMACS` binary in your `PATH`. Override with `make test EM
 
 - Keep the diff focused; one logical change per pull request.
 - Add or update tests in `autosync-git-tests.el` for any behaviour change.
-- The package must remain `package-lint` clean (CI enforces this via `elisp-check`).
+- Run `make lint` and `make test` locally before pushing; both must be clean.
 - `README.md` is generated from the `;;; Commentary:` block of `autosync-git.el` via `make README.md`. Edit the commentary, not the README.
 
 ## License

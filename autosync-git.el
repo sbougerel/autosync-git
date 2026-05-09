@@ -30,17 +30,17 @@
 ;; [![CI Result](https://github.com/sbougerel/autosync-git/actions/workflows/makefile.yml/badge.svg)](https://github.com/sbougerel/autosync-git/actions)
 ;;
 ;; Autosync-Git automatically synchronizes a local git repository branch with
-;; its upstream by invoking `git' directly.  It targets the narrow use case
-;; of keeping a *personal* repository in sync between devices: private notes,
+;; its upstream by invoking `git' directly.  It targets the narrow use case of
+;; keeping a *personal* repository in sync between devices: private notes,
 ;; configuration backups, or any single-author "save the current state to the
-;; cloud" workflow.  Autosync-Git is NOT suitable for team workflows; do not
-;; use it on shared branches.
+;; cloud" workflow.  Autosync-Git is NOT suitable for team workflows; do not use
+;; it on shared branches.
 ;;
 ;; The entry point is `autosync-git-mode', a buffer-local minor mode that
-;; installs a periodic background pull and a debounced after-save push for
-;; the buffer's repository.  It is normally turned on via `.dir-locals.el'
-;; (see Configuration below) so that visiting any file under a sync'd
-;; repository activates the automation.
+;; installs a periodic background pull and a debounced after-save push for the
+;; buffer's repository.  It is normally turned on via `.dir-locals.el' (see
+;; Configuration below) so that visiting any file under a sync'd repository
+;; activates the automation.
 ;;
 ;; The four interactive commands below can also be invoked manually,
 ;; independently of the mode:
@@ -52,10 +52,10 @@
 ;;
 ;; ### Pull strategy
 ;;
-;; The hardest decision in a personal-sync workflow is what to do when the
-;; local branch and upstream have diverged but do not actually conflict
-;; (e.g. you edited file A on one device and file B on another).
-;; `autosync-git-pull' uses a probe-then-rebase strategy:
+;; The hardest decision in a personal-sync workflow is what to do when the local
+;; branch and upstream have diverged but do not actually conflict (e.g. you
+;; edited file A on one device and file B on another).  `autosync-git-pull' uses
+;; a probe-then-rebase strategy:
 ;;
 ;; 1. Fetch from upstream.
 ;; 2. Compare HEAD to @{upstream}.  In-sync or ahead: nothing to do.
@@ -65,18 +65,18 @@
 ;;    the configured operation runs.  Otherwise the operation is refused
 ;;    and the working tree is left untouched.
 ;;
-;; The default operation is rebase, controlled by `autosync-git-pull-style';
-;; set it to `merge' to create a merge commit instead.  Rebase is the
-;; default because personal-sync commits are auto-generated snapshots,
-;; where preserving original SHAs matters less than keeping history linear.
+;; The default operation is rebase, controlled by `autosync-git-pull-style'; set
+;; it to `merge' to create a merge commit instead.  Rebase is the default
+;; because personal-sync commits are auto-generated snapshots, where preserving
+;; original SHAs matters less than keeping history linear.
 ;;
-;; A prefix arg (`C-u M-x autosync-git-pull`) skips the probe and runs
-;; the configured operation regardless, which may leave the working tree
-;; in REBASE or MERGING state for manual resolution.
+;; A prefix arg (`C-u M-x autosync-git-pull`) skips the probe and runs the
+;; configured operation regardless, which may leave the working tree in REBASE
+;; or MERGING state for manual resolution.
 ;;
-;; Note: `git merge-tree --write-tree` requires git 2.38 or newer.  On
-;; older git versions the probe always reports a conflict and the pull
-;; falls back to refusing -- failing closed.  Use `C-u' or upgrade git.
+;; Note: `git merge-tree --write-tree` requires git 2.38 or newer.  On older git
+;; versions the probe always reports a conflict and the pull falls back to
+;; refusing -- failing closed.  Use `C-u' or upgrade git.
 ;;
 ;; ### Configuration
 ;;
@@ -87,23 +87,22 @@
 ;;              (autosync-git-pull-style . rebase)
 ;;              (mode . autosync-git))))
 ;;
-;; This activates `autosync-git-mode' in any file visited under the
-;; directory containing the `.dir-locals.el'.  The mode installs a
-;; background pull timer and a debounced after-save push, so files saved
-;; in the repository are pushed shortly after, and remote changes are
-;; pulled periodically.
+;; This activates `autosync-git-mode' in any file visited under the directory
+;; containing the `.dir-locals.el'.  The mode installs a background pull timer
+;; and a debounced after-save push, so files saved in the repository are pushed
+;; shortly after, and remote changes are pulled periodically.
 ;;
 ;; See each variable's docstring for tuning.
 ;;
 ;; ### Defensive activation
 ;;
 ;; `autosync-git-mode' refuses to activate unless a `.dir-locals.el' (or
-;; `.dir-locals-2.el') in or above the buffer's directory contains
-;; `(mode . autosync-git)`.  This guards against tooling that misapplies
-;; dir-locals across unrelated buffers, which has been observed to
-;; silently trigger automatic git operations on the wrong repository.
-;; Set `autosync-git-skip-dir-locals-check' to `t' to bypass this when
-;; activating the mode programmatically without `.dir-locals.el'.
+;; `.dir-locals-2.el') in or above the buffer's directory contains `(mode
+;; . autosync-git)`.  This guards against tooling that misapplies dir-locals
+;; across unrelated buffers, which has been observed to silently trigger
+;; automatic git operations on the wrong repository.  Set
+;; `autosync-git-skip-dir-locals-check' to `t' to bypass this when activating
+;; the mode programmatically without `.dir-locals.el'.
 
 ;;; Installation:
 ;;
@@ -132,37 +131,37 @@
 ;;
 ;; 1.0.0 - Renamed from autosync-magit; dropped the magit dependency.
 ;;
-;; The package is now `autosync-git' and calls `git' directly via
-;; `process-file' (sync) and `make-process' (async).  This is a
-;; breaking change: the package name, file name, and every
-;; `autosync-magit-*' identifier are renamed to `autosync-git-*'.
+;; The package is now `autosync-git' and calls `git' directly via `process-file'
+;; (sync) and `make-process' (async).  This is a breaking change: the package
+;; name, file name, and every `autosync-magit-*' identifier are renamed to
+;; `autosync-git-*'.
 ;;
 ;; New commands: `autosync-git-status' and `autosync-git-sync'.
 ;;
-;; New pull strategy.  `autosync-git-pull' uses `git merge-tree` to
-;; probe for conflicts before changing the working tree.  When
-;; divergent branches would merge cleanly, the operation runs (rebase
-;; by default, configurable via `autosync-git-pull-style').  When the
-;; probe predicts conflicts, the working tree is left untouched.  A
-;; prefix arg skips the probe and runs the operation unconditionally.
+;; New pull strategy.  `autosync-git-pull' uses `git merge-tree` to probe for
+;; conflicts before changing the working tree.  When divergent branches would
+;; merge cleanly, the operation runs (rebase by default, configurable via
+;; `autosync-git-pull-style').  When the probe predicts conflicts, the working
+;; tree is left untouched.  A prefix arg skips the probe and runs the operation
+;; unconditionally.
 ;;
-;; Defensive activation.  `autosync-git-mode' now refuses to activate
-;; unless `.dir-locals.el' explicitly claims the mode, guarding against
-;; tooling that misapplies dir-locals across buffers.  Override with
+;; Defensive activation.  `autosync-git-mode' now refuses to activate unless
+;; `.dir-locals.el' explicitly claims the mode, guarding against tooling that
+;; misapplies dir-locals across buffers.  Override with
 ;; `autosync-git-skip-dir-locals-check'.
 ;;
 ;; Variable rename: `autosync-magit-after-merge-hook' is now
-;; `autosync-git-after-pull-hook'.  The `autosync-git-after-merge-hook'
-;; symbol remains as an obsolete alias.
+;; `autosync-git-after-pull-hook'.  The `autosync-git-after-merge-hook' symbol
+;; remains as an obsolete alias.
 ;;
 ;; 0.5.0 - Fixed a bug, added several improvements.
 ;;
 ;; Removed the installed find-file-hook, thereby fixing an issue with other
 ;; repositories being synced when it is unwanted.
 ;;
-;; Removed the redundant variable `autosync-git-pull-when-visiting': pulling
-;; now simply occurs whenever a file is visited and `autosync-git-mode' is
-;; active for the file.  Keeping this variable has no effect.
+;; Removed the redundant variable `autosync-git-pull-when-visiting': pulling now
+;; simply occurs whenever a file is visited and `autosync-git-mode' is active
+;; for the file.  Keeping this variable has no effect.
 ;;
 ;; Eliminated timers when more than one timer exists for the same repository.
 ;;
@@ -204,22 +203,24 @@
 (defcustom autosync-git-pull-interval 10
   "Minimum seconds between two pull attempts in the same repository.
 
-Throttles pulls triggered by buffer visits and by the background
-timer so that they never run closer than this interval apart."
+Throttles pulls triggered by buffer visits and by the background timer
+so that they never run closer than this interval apart."
   :type 'integer
-  :group 'autosync-git)
+  :group 'autosync-git
+  :package-version '(autosync-git . "0.1.0"))
 
 ;;;###autoload(put 'autosync-git-pull-timer 'safe-local-variable 'integerp)
 (defcustom autosync-git-pull-timer 300
   "Period in seconds of the background pull timer.
 
-The timer is started when `autosync-git-mode' first activates in
-a repository and runs as long as Emacs is alive.  Set this in
-`.dir-locals.el' so each repository can have its own cadence; the
-value is copied into a per-repository setting on activation, and
-later mode activations in the same repository update that value."
+The timer is started when `autosync-git-mode' first activates in a
+repository and runs as long as Emacs is alive.  Set this in
+`.dir-locals.el' so each repository can have its own cadence; the value
+is copied into a per-repository setting on activation, and later mode
+activations in the same repository update that value."
   :type 'integer
-  :group 'autosync-git)
+  :group 'autosync-git
+  :package-version '(autosync-git . "0.4.0"))
 
 ;;;###autoload(put 'autosync-git-push-debounce 'safe-local-variable 'integerp)
 (defcustom autosync-git-push-debounce 5
@@ -228,17 +229,19 @@ later mode activations in the same repository update that value."
 Multiple saves within this window collapse into a single push.
 Set this in `.dir-locals.el' for per-repository tuning."
   :type 'integer
-  :group 'autosync-git)
+  :group 'autosync-git
+  :package-version '(autosync-git . "0.1.0"))
 
 ;;;###autoload(put 'autosync-git-commit-message 'safe-local-variable 'stringp)
 (defcustom autosync-git-commit-message "Automated commit by autosync-git"
   "Commit message used by `autosync-git-push' and the after-save push.
 
-May be set buffer-locally for per-file customization.  When
-several saves coalesce within `autosync-git-push-debounce', only
-the buffer-local value from the first save is used."
+May be set buffer-locally for per-file customization.  When several
+saves coalesce within `autosync-git-push-debounce', only the
+buffer-local value from the first save is used."
   :type 'string
-  :group 'autosync-git)
+  :group 'autosync-git
+  :package-version '(autosync-git . "0.1.0"))
 
 (define-obsolete-variable-alias
   'autosync-git-after-merge-hook
@@ -248,10 +251,11 @@ the buffer-local value from the first save is used."
 (defcustom autosync-git-after-pull-hook nil
   "Hook run after `autosync-git-pull' successfully updates the local branch.
 
-The hook does not run when the pull is a no-op (already in sync,
-or local is ahead) or when it fails (conflict, missing upstream)."
+The hook does not run when the pull is a no-op (already in sync, or
+local is ahead) or when it fails (conflict, missing upstream)."
   :type 'hook
-  :group 'autosync-git)
+  :group 'autosync-git
+  :package-version '(autosync-git . "1.0.0"))
 
 ;;;###autoload(put 'autosync-git-pull-style 'safe-local-variable 'symbolp)
 (defcustom autosync-git-pull-style 'rebase
@@ -261,35 +265,39 @@ When the local and upstream branches have diverged but the merge
 of the two would not produce conflicts (as predicted by
 `git merge-tree'), `autosync-git-pull' will:
 
-- `rebase' (default): rebase local commits onto @{upstream}.
-  History stays linear; commits get new SHAs.  Best for
-  personal-sync repositories where commits are auto-generated
-  snapshots and linear history is preferable.
+- `rebase' (default): rebase local commits onto @{upstream}.  History
+  stays linear; commits get new SHAs.  Best for personal-sync
+  repositories where commits are auto-generated snapshots and linear
+  history is preferable.
 
-- `merge': create a merge commit joining the two branches.
-  Preserves original commit SHAs.
+- `merge': create a merge commit joining the two branches.  Preserves
+  original commit SHAs.
 
-When the probe predicts a conflict, the operation is refused and
-the working tree is left untouched.  Use a prefix arg with
+When the probe predicts a conflict, the operation is refused and the
+working tree is left untouched.  Use a prefix arg with
 `autosync-git-pull' to skip the probe and run the operation
 unconditionally (which may leave a REBASE or MERGING state)."
   :type '(choice (const :tag "Rebase onto upstream" rebase)
-                 (const :tag "Merge upstream into local" merge))
-  :group 'autosync-git)
+          (const :tag "Merge upstream into local" merge))
+  :group 'autosync-git
+  :package-version '(autosync-git . "1.0.0"))
 
 (defcustom autosync-git-skip-dir-locals-check nil
   "When non-nil, do not verify that `.dir-locals.el' claims this mode.
 
-By default, `autosync-git-mode' refuses to activate unless a
-`.dir-locals.el' file (or `.dir-locals-2.el') in or above the
-buffer's directory contains `(mode . autosync-git)'.  This is a
-defensive measure against tooling that misapplies dir-locals
-across unrelated buffers.
+By default, `autosync-git-mode' refuses to activate from
+`.dir-locals.el' unless that file (or `.dir-locals-2.el' in or above the
+buffer's directory) contains `(mode . autosync-git)'.  This is a
+defensive measure against tooling that misapplies dir-locals across
+unrelated buffers.
 
-Set this to t only when enabling the mode programmatically (for
-example from your init file) without `.dir-locals.el'."
+Interactive activation (\\[autosync-git-mode]) bypasses the check
+unconditionally, so you only need this variable when activating the mode
+programmatically from elisp code (e.g. from your init file) without
+`.dir-locals.el'."
   :type 'boolean
-  :group 'autosync-git)
+  :group 'autosync-git
+  :package-version '(autosync-git . "1.0.0"))
 
 (cl-defstruct (autosync-git--sync
                (:constructor autosync-git--sync-create)
@@ -385,10 +393,10 @@ Return nil when @{push} is undefined or already at HEAD."
 (defun autosync-git--probe-clean-p (repo-dir)
   "Return non-nil if HEAD merges cleanly with @{upstream} in REPO-DIR.
 
-Uses `git merge-tree --write-tree' to predict conflicts without
-touching the worktree.  Requires git 2.38 or newer.  On older git
-versions the probe will report a conflict (exit non-zero) and
-`autosync-git-pull' will refuse to act, which fails closed."
+Uses `git merge-tree --write-tree' to predict conflicts without touching
+the worktree.  Requires git 2.38 or newer.  On older git versions the
+probe will report a conflict (exit non-zero) and `autosync-git-pull'
+will refuse to act, which fails closed."
   (zerop (car (autosync-git--call repo-dir
                                   "merge-tree" "--write-tree"
                                   "HEAD" "@{upstream}"))))
@@ -426,14 +434,14 @@ Both values are integers.  Returns nil if @{upstream} is unset."
 (defun autosync-git--dir-locals-claims-mode-p (&optional file)
   "Return non-nil if a dir-locals file for FILE claims `autosync-git-mode'.
 
-Walks up from FILE (defaulting to `default-directory') looking
-for `.dir-locals.el' and `.dir-locals-2.el', reads each, and
-checks whether any selector's variable alist contains
+Walks up from FILE (defaulting to `default-directory') looking for
+`.dir-locals.el' and `.dir-locals-2.el', reads each, and checks whether
+any selector's variable alist contains
 `(mode . autosync-git)'.
 
-Used as a defensive check before activating the minor mode, so
-that buffers visited via tooling that mishandles dir-locals do
-not accidentally trigger automatic git operations."
+Used as a defensive check before activating the minor mode, so that
+buffers visited via tooling that mishandles dir-locals do not
+accidentally trigger automatic git operations."
   (let ((dir (file-name-directory
               (expand-file-name (or file default-directory))))
         (claims nil))
@@ -456,19 +464,19 @@ not accidentally trigger automatic git operations."
 (defun autosync-git-pull (path &optional force)
   "Fetch and update the local branch of repository at PATH.
 
-By default, the local branch is updated only when it can be done
-without conflicts.  The exact operation is selected by
-`autosync-git-pull-style' (`rebase' or `merge').  Behaviour by
-ancestry of HEAD vs @{upstream}:
+By default, the local branch is updated only when it can be done without
+conflicts.  The exact operation is selected by
+`autosync-git-pull-style' (`rebase' or `merge').  Behaviour by ancestry
+of HEAD vs @{upstream}:
 
 - in-sync, ahead, no-upstream: no-op (with a message for missing
   upstream).
 - behind: fast-forward.
 - diverged: probe with `git merge-tree'; only proceed if clean.
 
-With prefix arg FORCE, skip the conflict probe and run the
-configured operation regardless.  This may leave the working
-tree in REBASE or MERGING state for manual resolution.
+With prefix arg FORCE, skip the conflict probe and run the configured
+operation regardless.  This may leave the working tree in REBASE or
+MERGING state for manual resolution.
 
 `autosync-git-after-pull-hook' runs only when the local branch
 actually changed."
@@ -505,9 +513,8 @@ non-nil, is a function of one argument and is invoked with one of:
 
 (defun autosync-git--apply-pull (repo-dir force)
   "Apply the pull operation to REPO-DIR after fetch has completed.
-Return a result symbol; see `autosync-git--pull-impl' for the
-list of possible values.  FORCE has the same meaning as in
-`autosync-git-pull'."
+Return a result symbol; see `autosync-git--pull-impl' for the list of
+possible values.  FORCE has the same meaning as in `autosync-git-pull'."
   (pcase (autosync-git--upstream-ancestry repo-dir)
     ((or 'in-sync 'ahead) 'unchanged)
     ('behind
@@ -533,8 +540,8 @@ on success or `failed' otherwise."
 
 (defun autosync-git--run-diverged (repo-dir force)
   "Reconcile diverged HEAD and @{upstream} in REPO-DIR.
-Without FORCE, refuse to act when the probe predicts conflicts.
-Return one of `updated', `refused', `conflicted', or `failed'."
+Without FORCE, refuse to act when the probe predicts conflicts.  Return
+one of `updated', `refused', `conflicted', or `failed'."
   (if (and (not force) (not (autosync-git--probe-clean-p repo-dir)))
       (progn
         (message "Autosync-Git: %s would conflict with upstream; \
@@ -544,11 +551,10 @@ worktree left untouched (use C-u to force)" repo-dir)
 
 (defun autosync-git--run-pull-op (repo-dir force)
   "Run the configured pull operation in REPO-DIR.
-On clean exit, run `autosync-git-after-pull-hook' and return
-`updated'.  On conflict without FORCE, abort the operation so
-the worktree stays clean and return `refused'.  With FORCE, leave
-the conflict in the worktree and return `conflicted'.  Other
-non-zero exits return `failed'."
+On clean exit, run `autosync-git-after-pull-hook' and return `updated'.
+On conflict without FORCE, abort the operation so the worktree stays
+clean and return `refused'.  With FORCE, leave the conflict in the
+worktree and return `conflicted'.  Other non-zero exits return `failed'."
   (let* ((style autosync-git-pull-style)
          (cmd (pcase style
                 ('rebase (list "rebase" "@{upstream}"))
@@ -614,12 +620,11 @@ upstream, and any unmerged paths."
 (defun autosync-git-sync (path &optional force)
   "Synchronize the repository at PATH: pull, then push.
 
-Runs `autosync-git-pull' with FORCE and, on completion, pushes
-when the pull leaves the local branch in a clean state vs the
-remote (i.e. the pull result is `updated' or `unchanged').
-Pulls that are refused, conflicted, or failed do not trigger a
-push attempt, since `git push' would be rejected as
-non-fast-forward."
+Runs `autosync-git-pull' with FORCE and, on completion, pushes when the
+pull leaves the local branch in a clean state vs the remote (i.e. the
+pull result is `updated' or `unchanged').  Pulls that are refused,
+conflicted, or failed do not trigger a push attempt, since `git push'
+would be rejected as non-fast-forward."
   (interactive "D\nP")
   (let ((repo-dir (autosync-git--toplevel path)))
     (if (not repo-dir)
@@ -637,8 +642,8 @@ non-fast-forward."
 (defun autosync-git-push (path message)
   "Create a commit with MESSAGE and push the repository at PATH.
 
-Stages all changes, commits with MESSAGE, and pushes if HEAD has
-moved past @{push}.  All git invocations run asynchronously."
+Stages all changes, commits with MESSAGE, and pushes if HEAD has moved
+past @{push}.  All git invocations run asynchronously."
   (interactive "D\nMCommit message: ")
   (let ((repo-dir (autosync-git--toplevel path)))
     (if (not repo-dir)
@@ -657,9 +662,9 @@ moved past @{push}.  All git invocations run asynchronously."
 (defun autosync-git--throttle-pull (repo-dir)
   "Pull REPO-DIR if `autosync-git-pull-interval' has elapsed since the last try.
 
-Acts as the gate in front of every automatic pull (timer-driven
-or visit-driven), so that a flurry of triggers cannot turn into a
-flurry of git invocations."
+Acts as the gate in front of every automatic pull (timer-driven or
+visit-driven), so that a flurry of triggers cannot turn into a flurry of
+git invocations."
   (when-let ((sync (cdr (assoc repo-dir autosync-git--sync-alist))))
     (when (time-less-p
            (time-add (autosync-git--sync-last-pull sync)
@@ -670,8 +675,8 @@ flurry of git invocations."
 (defun autosync-git--pull-when-visiting (repo-dir)
   "Pull REPO-DIR (throttled) when visiting a real file buffer.
 
-Skips non-file buffers like the minibuffer, which can otherwise
-trigger a pull on every selection change."
+Skips non-file buffers like the minibuffer, which can otherwise trigger
+a pull on every selection change."
   (when (buffer-file-name)
     (autosync-git--throttle-pull repo-dir)))
 
@@ -689,9 +694,9 @@ and whose first argument equals REPO-DIR."
   "Pull REPO-DIR from upstream and reschedule the next pull.
 
 Recurring driver for the background timer started in
-`autosync-git-mode'.  Skips rescheduling if another timer for
-REPO-DIR already exists, so multiple buffers in the same
-repository never multiply the timer count."
+`autosync-git-mode'.  Skips rescheduling if another timer for REPO-DIR
+already exists, so multiple buffers in the same repository never
+multiply the timer count."
   (when-let ((time-triggered (current-time))
              (sync (cdr (assoc repo-dir autosync-git--sync-alist))))
     (autosync-git--throttle-pull repo-dir)
@@ -720,19 +725,21 @@ repository never multiply the timer count."
 (define-minor-mode autosync-git-mode
   "Automatically synchronize this repository with its upstream.
 
-Activates a background pull timer and a debounced after-save
-push.  Intended to be turned on via `.dir-locals.el' in
-repositories you want to keep in sync; example:
+Activates a background pull timer and a debounced after-save push.
+Intended to be turned on via `.dir-locals.el' in repositories you want
+to keep in sync; example:
 
     ((nil . ((autosync-git-commit-message . \"My commit message\")
              (autosync-git-pull-timer . 300)
              (autosync-git-pull-style . rebase)
              (mode . autosync-git))))
 
-The mode refuses to activate unless `.dir-locals.el' explicitly
-claims it via `(mode . autosync-git)'; this is a defensive check
-against tooling that misapplies dir-locals across buffers.  See
-`autosync-git-skip-dir-locals-check' to bypass."
+When activated from `.dir-locals.el', the mode refuses to enable unless
+that file explicitly claims it via `(mode . autosync-git)' \\=- a
+defensive check against tooling that misapplies dir-locals across
+buffers.  Interactive activation (\\[autosync-git-mode]) bypasses this
+check.  See `autosync-git-skip-dir-locals-check' to also bypass for
+non-interactive elisp callers."
   :init-value nil
   :global nil
   :lighter " ↕"
@@ -743,11 +750,14 @@ against tooling that misapplies dir-locals across buffers.  See
          ((not repo-dir)
           (autosync-git-mode -1))
          ((not (or autosync-git-skip-dir-locals-check
+                   (eq this-command 'autosync-git-mode)
                    (autosync-git--dir-locals-claims-mode-p
                     (or buffer-file-name default-directory))))
           ;; Defensive: refuse activation when no `.dir-locals.el' in the
-          ;; buffer's tree claims this mode.  Catches accidental activation
-          ;; via tooling that mishandles dir-locals across buffers.
+          ;; buffer's tree claims this mode.  Catches accidental activation via
+          ;; tooling that mishandles dir-locals across buffers.  Interactive M-x
+          ;; (which sets `this-command') and the skip variable both bypass this
+          ;; guard.
           (autosync-git-mode -1))
          (t
           (let ((sync (cdr (assoc repo-dir autosync-git--sync-alist))))
