@@ -476,55 +476,79 @@ actually changed."
   (autosync-git--pull-impl path force nil))
 
 (defun autosync-git--pull-impl (path force after)
-  "Execute pull for PATH; call AFTER (a function of no args) on completion.
-FORCE has the same meaning as in `autosync-git-pull'.  AFTER is
-called whether the pull succeeded, was a no-op, or failed."
+  "Execute pull for PATH; call AFTER with a result symbol on completion.
+
+FORCE has the same meaning as in `autosync-git-pull'.  AFTER, if
+non-nil, is a function of one argument and is invoked with one of:
+
+- `updated'    local moved forward (fast-forward, rebase, or merge).
+- `unchanged'  pull was a no-op (in-sync or already ahead).
+- `refused'    diverged from upstream and the probe predicted a
+               conflict; worktree was left untouched.
+- `conflicted' ran with FORCE and left a conflict in the worktree
+               for manual resolution.
+- `failed'     missing repository or upstream, or git failed
+               unexpectedly."
   (let ((repo-dir (autosync-git--toplevel path)))
     (if (not repo-dir)
         (progn
           (message "Autosync-Git: \"%s\" is not a path to a git repository" path)
-          (when after (funcall after)))
+          (when after (funcall after 'failed)))
       (when-let ((sync (cdr (assoc repo-dir autosync-git--sync-alist))))
         (setf (autosync-git--sync-last-pull sync) (current-time)))
       (autosync-git--call-async
        repo-dir
        (lambda (_)
-         (autosync-git--apply-pull repo-dir force)
-         (when after (funcall after)))
+         (let ((result (autosync-git--apply-pull repo-dir force)))
+           (when after (funcall after result))))
        "fetch"))))
 
 (defun autosync-git--apply-pull (repo-dir force)
   "Apply the pull operation to REPO-DIR after fetch has completed.
-FORCE has the same meaning as in `autosync-git-pull'."
+Return a result symbol; see `autosync-git--pull-impl' for the
+list of possible values.  FORCE has the same meaning as in
+`autosync-git-pull'."
   (pcase (autosync-git--upstream-ancestry repo-dir)
-    ('in-sync nil)
-    ('ahead   nil)
+    ((or 'in-sync 'ahead) 'unchanged)
     ('behind
      (autosync-git--run-fast-forward repo-dir))
     ('diverged
      (autosync-git--run-diverged repo-dir force))
     ('no-upstream
-     (message "Autosync-Git: %s has no upstream configured" repo-dir))))
+     (message "Autosync-Git: %s has no upstream configured" repo-dir)
+     'failed)))
 
 (defun autosync-git--run-fast-forward (repo-dir)
-  "Fast-forward HEAD to @{upstream} in REPO-DIR; run after-pull hook on success."
+  "Fast-forward HEAD to @{upstream} in REPO-DIR.
+Run `autosync-git-after-pull-hook' on success.  Return `updated'
+on success or `failed' otherwise."
   (let ((exit (car (autosync-git--call repo-dir "merge" "--ff-only"))))
-    (if (zerop exit)
-        (run-hooks 'autosync-git-after-pull-hook)
-      (message "Autosync-Git: Fast-forward failed in %s" repo-dir))))
+    (cond
+     ((zerop exit)
+      (run-hooks 'autosync-git-after-pull-hook)
+      'updated)
+     (t
+      (message "Autosync-Git: Fast-forward failed in %s" repo-dir)
+      'failed))))
 
 (defun autosync-git--run-diverged (repo-dir force)
   "Reconcile diverged HEAD and @{upstream} in REPO-DIR.
-Without FORCE, refuse to act when the conflict probe predicts conflicts."
+Without FORCE, refuse to act when the probe predicts conflicts.
+Return one of `updated', `refused', `conflicted', or `failed'."
   (if (and (not force) (not (autosync-git--probe-clean-p repo-dir)))
-      (message "Autosync-Git: %s would conflict with upstream; \
+      (progn
+        (message "Autosync-Git: %s would conflict with upstream; \
 worktree left untouched (use C-u to force)" repo-dir)
+        'refused)
     (autosync-git--run-pull-op repo-dir force)))
 
 (defun autosync-git--run-pull-op (repo-dir force)
   "Run the configured pull operation in REPO-DIR.
-On clean exit, run `autosync-git-after-pull-hook'.  On conflict
-without FORCE, abort the operation so the worktree stays clean."
+On clean exit, run `autosync-git-after-pull-hook' and return
+`updated'.  On conflict without FORCE, abort the operation so
+the worktree stays clean and return `refused'.  With FORCE, leave
+the conflict in the worktree and return `conflicted'.  Other
+non-zero exits return `failed'."
   (let* ((style autosync-git-pull-style)
          (cmd (pcase style
                 ('rebase (list "rebase" "@{upstream}"))
@@ -533,17 +557,21 @@ without FORCE, abort the operation so the worktree stays clean."
          (exit (car (apply #'autosync-git--call repo-dir cmd))))
     (cond
      ((zerop exit)
-      (run-hooks 'autosync-git-after-pull-hook))
+      (run-hooks 'autosync-git-after-pull-hook)
+      'updated)
      ((autosync-git--unmerged-p repo-dir)
       (cond
        (force
-        (message "Autosync-Git: Conflict in %s - resolve manually" repo-dir))
+        (message "Autosync-Git: Conflict in %s - resolve manually" repo-dir)
+        'conflicted)
        (t
         (autosync-git--abort-pull-op repo-dir style)
         (message "Autosync-Git: Conflict in %s - aborted, worktree restored"
-                 repo-dir))))
+                 repo-dir)
+        'refused)))
      (t
-      (message "Autosync-Git: %s failed in %s" style repo-dir)))))
+      (message "Autosync-Git: %s failed in %s" style repo-dir)
+      'failed))))
 
 (defun autosync-git--abort-pull-op (repo-dir style)
   "Abort an in-progress STYLE operation in REPO-DIR."
@@ -586,18 +614,21 @@ upstream, and any unmerged paths."
 (defun autosync-git-sync (path &optional force)
   "Synchronize the repository at PATH: pull, then push.
 
-Runs `autosync-git-pull' (with FORCE) and, once it completes,
-pushes any local commits that are not yet on @{push}.  When the
-pull is blocked by a conflict and FORCE is nil, the push step
-still runs for any pre-existing local commits beyond @{push}."
+Runs `autosync-git-pull' with FORCE and, on completion, pushes
+when the pull leaves the local branch in a clean state vs the
+remote (i.e. the pull result is `updated' or `unchanged').
+Pulls that are refused, conflicted, or failed do not trigger a
+push attempt, since `git push' would be rejected as
+non-fast-forward."
   (interactive "D\nP")
   (let ((repo-dir (autosync-git--toplevel path)))
     (if (not repo-dir)
         (message "Autosync-Git: \"%s\" is not a path to a git repository" path)
       (autosync-git--pull-impl
        repo-dir force
-       (lambda ()
-         (when (autosync-git--needs-push-p repo-dir)
+       (lambda (result)
+         (when (and (memq result '(updated unchanged))
+                    (autosync-git--needs-push-p repo-dir))
            (autosync-git-push repo-dir
                               (or autosync-git-commit-message
                                   (default-value 'autosync-git-commit-message)))))))))

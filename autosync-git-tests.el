@@ -347,6 +347,27 @@ synchronously calls the done callback with exit code 0."
     (autosync-git-sync "/dir")
     (should (equal '(("fetch")) call-recorder))))
 
+(ert-deftest autosync-git-sync--refused-skips-push ()
+  "Sync skips the push step when the pull is refused (probe predicts conflict)."
+  (cl-letf (((symbol-value 'call-recorder) nil)
+            ((symbol-value 'autosync-git--sync-alist)
+             (list (cons "/dir" (autosync-git--sync-create
+                                 :last-pull (seconds-to-time 0)
+                                 :next-push (seconds-to-time 0)
+                                 :timer 0))))
+            ((symbol-function 'autosync-git--toplevel) (always-return "/dir"))
+            ((symbol-function 'autosync-git--call-async) (stub-call-async-success))
+            ((symbol-function 'autosync-git--upstream-ancestry) (always-return 'diverged))
+            ((symbol-function 'autosync-git--probe-clean-p) (always-nil))
+            ;; Even though local has commits beyond @{push}, the diverged-refused
+            ;; pull means a push would be rejected, so we skip it.
+            ((symbol-function 'autosync-git--needs-push-p) (always-return t))
+            ((symbol-function 'message) (record-calls-and-return nil)))
+    (autosync-git-sync "/dir")
+    (should-not (cl-some (lambda (entry)
+                           (member entry '(("add" "-A") ("push"))))
+                         call-recorder))))
+
 ;;;; Dir-locals guard:
 
 (ert-deftest autosync-git--alist-claims-mode-p--positive ()
