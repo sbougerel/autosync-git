@@ -1,4 +1,4 @@
-;;; autosync-magit.el --- Automatically synchronize content with upstream via magit -*- lexical-binding: t; -*-
+;;; autosync-git.el --- Automatically synchronize content with upstream via magit -*- lexical-binding: t; -*-
 ;;
 ;; Copyright (C) 2023 Sylvain Bougerel
 ;;
@@ -25,7 +25,7 @@
 
 ;;; Commentary:
 
-;;  Test 'autosync-magit'.
+;;  Test 'autosync-git'.
 
 ;;; Code:
 
@@ -62,9 +62,9 @@
           (setq call-recorder (list args))))
     value))
 
-(require 'autosync-magit)
+(require 'autosync-git)
 
-(ert-deftest autosync-magit-push--ahead ()
+(ert-deftest autosync-git-push--ahead ()
   (cl-letf (((symbol-value 'call-recorder) nil)
             ((symbol-function 'hack-dir-local-variables-non-file-buffer) #'ignore)
             ((symbol-function 'magit-toplevel) (always-return "/dir"))
@@ -72,14 +72,14 @@
             ((symbol-function 'magit-rev-eq) (always-nil))
             ((symbol-function 'set-process-sentinel)
              (lambda (process sentinel) process (funcall sentinel))))
-    (autosync-magit-push "/dir" "other message")
+    (autosync-git-push "/dir" "other message")
     (should
      (equal '(("add" "-A")
               ("commit" "-a" "-m" "other message")
               ("push"))
             call-recorder))))
 
-(ert-deftest autosync-magit-push--no-changes ()
+(ert-deftest autosync-git-push--no-changes ()
   (cl-letf (((symbol-value 'call-recorder) nil)
             ((symbol-function 'hack-dir-local-variables-non-file-buffer) #'ignore)
             ((symbol-function 'magit-toplevel) (always-return "/dir"))
@@ -87,16 +87,16 @@
             ((symbol-function 'magit-rev-eq) (always-return t))
             ((symbol-function 'set-process-sentinel)
              (lambda (process sentinel) process (funcall sentinel))))
-    (autosync-magit-push "/dir" "other message")
+    (autosync-git-push "/dir" "other message")
     (should
      (equal '(("add" "-A")
               ("commit" "-a" "-m" "other message"))
             call-recorder))))
 
-(ert-deftest autosync-magit-pull--behind ()
+(ert-deftest autosync-git-pull--behind ()
   (cl-letf (((symbol-value 'call-recorder) nil)
-            ((symbol-value 'autosync-magit--sync-alist)
-             (list (cons "/dir" (autosync-magit--sync-create
+            ((symbol-value 'autosync-git--sync-alist)
+             (list (cons "/dir" (autosync-git--sync-create
                                  :last-pull (seconds-to-time 0)
                                  :next-push (seconds-to-time 0)
                                  :timer 0))))
@@ -109,20 +109,20 @@
              (lambda (process sentinel) process (funcall sentinel)))
             ((symbol-function 'run-hooks) (record-only-and-return
                                            t
-                                           '((autosync-magit-after-merge-hook)))))
-    (autosync-magit-pull "/dir")
+                                           '((autosync-git-after-merge-hook)))))
+    (autosync-git-pull "/dir")
     (should
      (equal '(("fetch")
               ("merge")
-              (autosync-magit-after-merge-hook))
+              (autosync-git-after-merge-hook))
             call-recorder))
     (should (not (equal (seconds-to-time 0)
-                        (autosync-magit--sync-last-pull (cdr (assoc "/dir" autosync-magit--sync-alist))))))))
+                        (autosync-git--sync-last-pull (cdr (assoc "/dir" autosync-git--sync-alist))))))))
 
-(ert-deftest autosync-magit-pull--ahead ()
+(ert-deftest autosync-git-pull--ahead ()
   (cl-letf (((symbol-value 'call-recorder) nil)
-            ((symbol-value 'autosync-magit--sync-alist)
-             (list (cons "/dir" (autosync-magit--sync-create
+            ((symbol-value 'autosync-git--sync-alist)
+             (list (cons "/dir" (autosync-git--sync-create
                                  :last-pull (seconds-to-time 0)
                                  :next-push (seconds-to-time 0)
                                  :timer 0))))
@@ -135,19 +135,19 @@
              (lambda (process sentinel) process (funcall sentinel)))
             ((symbol-function 'run-hooks) (record-only-and-return
                                            t
-                                           '((autosync-magit-after-merge-hook)))))
-    (autosync-magit-pull "/dir")
+                                           '((autosync-git-after-merge-hook)))))
+    (autosync-git-pull "/dir")
     (should
      (equal '(("fetch"))
             call-recorder))
     (should (not (equal (seconds-to-time 0)
-                        (autosync-magit--sync-last-pull (cdr (assoc "/dir" autosync-magit--sync-alist))))))))
+                        (autosync-git--sync-last-pull (cdr (assoc "/dir" autosync-git--sync-alist))))))))
 
-(ert-deftest autosync-magit-pull--merge-conflict ()
+(ert-deftest autosync-git-pull--merge-conflict ()
   "Test that merge conflicts are detected and user is notified."
   (cl-letf (((symbol-value 'call-recorder) nil)
-            ((symbol-value 'autosync-magit--sync-alist)
-             (list (cons "/dir" (autosync-magit--sync-create
+            ((symbol-value 'autosync-git--sync-alist)
+             (list (cons "/dir" (autosync-git--sync-create
                                  :last-pull (seconds-to-time 0)
                                  :next-push (seconds-to-time 0)
                                  :timer 0))))
@@ -162,19 +162,19 @@
             ((symbol-function 'message) (record-calls-and-return nil))
             ((symbol-function 'run-hooks) (record-only-and-return
                                            t
-                                           '((autosync-magit-after-merge-hook)))))
-    (autosync-magit-pull "/dir")
+                                           '((autosync-git-after-merge-hook)))))
+    (autosync-git-pull "/dir")
     (should
      (equal '(("fetch")
               ("merge")
-              ("Autosync-Magit: Merge conflict in %s - please resolve manually" "/dir"))
+              ("Autosync-Git: Merge conflict in %s - please resolve manually" "/dir"))
             call-recorder))))
 
-(ert-deftest autosync-magit-pull--merge-failure ()
+(ert-deftest autosync-git-pull--merge-failure ()
   "Test that non-conflict merge failures are handled."
   (cl-letf (((symbol-value 'call-recorder) nil)
-            ((symbol-value 'autosync-magit--sync-alist)
-             (list (cons "/dir" (autosync-magit--sync-create
+            ((symbol-value 'autosync-git--sync-alist)
+             (list (cons "/dir" (autosync-git--sync-create
                                  :last-pull (seconds-to-time 0)
                                  :next-push (seconds-to-time 0)
                                  :timer 0))))
@@ -189,206 +189,206 @@
             ((symbol-function 'message) (record-calls-and-return nil))
             ((symbol-function 'run-hooks) (record-only-and-return
                                            t
-                                           '((autosync-magit-after-merge-hook)))))
-    (autosync-magit-pull "/dir")
+                                           '((autosync-git-after-merge-hook)))))
+    (autosync-git-pull "/dir")
     (should
      (equal '(("fetch")
               ("merge")
-              ("Autosync-Magit: Merge failed in %s" "/dir"))
+              ("Autosync-Git: Merge failed in %s" "/dir"))
             call-recorder))))
 
 ;; Add push bounce / pull bounce tests
-(ert-deftest autosync-magit--throttle-pull--elapsed ()
+(ert-deftest autosync-git--throttle-pull--elapsed ()
   (cl-letf (((symbol-value 'call-recorder) nil)
-            ((symbol-value 'autosync-magit--sync-alist)
-             (list (cons "/dir" (autosync-magit--sync-create
+            ((symbol-value 'autosync-git--sync-alist)
+             (list (cons "/dir" (autosync-git--sync-create
                                  :last-pull (seconds-to-time 0)
                                  :next-push (seconds-to-time 0)
                                  :timer 0))))
-            ((symbol-function 'autosync-magit-pull) (record-calls-and-return t)))
-    (autosync-magit--throttle-pull "/dir")
+            ((symbol-function 'autosync-git-pull) (record-calls-and-return t)))
+    (autosync-git--throttle-pull "/dir")
     (should
      (equal '(("/dir"))
             call-recorder))))
 
-(ert-deftest autosync-magit--throttle-pull--throttled ()
+(ert-deftest autosync-git--throttle-pull--throttled ()
   (cl-letf (((symbol-value 'call-recorder) nil)
-            ((symbol-value 'autosync-magit--sync-alist)
-             (list (cons "/dir" (autosync-magit--sync-create
+            ((symbol-value 'autosync-git--sync-alist)
+             (list (cons "/dir" (autosync-git--sync-create
                                  :last-pull (seconds-to-time (current-time))
                                  :next-push (seconds-to-time 0)
                                  :timer 0))))
-            ((symbol-function 'autosync-magit-pull) (record-calls-and-return t)))
-    (autosync-magit--throttle-pull "/dir")
+            ((symbol-function 'autosync-git-pull) (record-calls-and-return t)))
+    (autosync-git--throttle-pull "/dir")
     (should
      (equal nil
             call-recorder))))
 
-(ert-deftest autosync-magit--push-after-save--elapsed ()
+(ert-deftest autosync-git--push-after-save--elapsed ()
   (cl-letf (((symbol-value 'call-recorder) nil)
-            ((symbol-value 'autosync-magit-commit-message) "commit message")
-            ((symbol-value 'autosync-magit--sync-alist)
-             (list (cons "/dir" (autosync-magit--sync-create
+            ((symbol-value 'autosync-git-commit-message) "commit message")
+            ((symbol-value 'autosync-git--sync-alist)
+             (list (cons "/dir" (autosync-git--sync-create
                                  :last-pull (seconds-to-time 0)
                                  :next-push (seconds-to-time 0)
                                  :timer 0))))
             ((symbol-function 'magit-toplevel) (always-return "/dir"))
             ((symbol-function 'run-with-timer) (record-calls-and-return t)))
-    (autosync-magit--push-after-save)
+    (autosync-git--push-after-save)
     (should
-     (equal (list (list autosync-magit-push-debounce nil
-                        #'autosync-magit-push "/dir" "commit message"))
+     (equal (list (list autosync-git-push-debounce nil
+                        #'autosync-git-push "/dir" "commit message"))
             call-recorder))))
 
-(ert-deftest autosync-magit--push-after-save--debounced ()
+(ert-deftest autosync-git--push-after-save--debounced ()
   (cl-letf (((symbol-value 'call-recorder) nil)
-            ((symbol-value 'autosync-magit-commit-message) "commit message")
-            ((symbol-value 'autosync-magit--sync-alist)
-             (list (cons "/dir" (autosync-magit--sync-create
+            ((symbol-value 'autosync-git-commit-message) "commit message")
+            ((symbol-value 'autosync-git--sync-alist)
+             (list (cons "/dir" (autosync-git--sync-create
                                  :last-pull (seconds-to-time 0)
                                  :next-push (seconds-to-time (time-add (current-time)
-                                                                       autosync-magit-push-debounce))
+                                                                       autosync-git-push-debounce))
                                  :timer 0))))
             ((symbol-function 'magit-toplevel) (always-return "/dir"))
             ((symbol-function 'run-with-timer) (record-calls-and-return t)))
-    (autosync-magit--push-after-save)
+    (autosync-git--push-after-save)
     (should
      (equal nil
             call-recorder))))
 
-(ert-deftest autosync-magit--pull-on-timer--trigger ()
+(ert-deftest autosync-git--pull-on-timer--trigger ()
   (cl-letf (((symbol-value 'call-recorder) nil)
-            ((symbol-value 'autosync-magit--sync-alist)
-             (list (cons "/dir" (autosync-magit--sync-create
+            ((symbol-value 'autosync-git--sync-alist)
+             (list (cons "/dir" (autosync-git--sync-create
                                  :last-pull (seconds-to-time 0)
                                  :next-push (seconds-to-time 0)
                                  :timer 1234))))
-            ((symbol-function 'autosync-magit--throttle-pull) (record-calls-and-return t))
-            ((symbol-function 'autosync-magit--timer-exists) (always-nil))
+            ((symbol-function 'autosync-git--throttle-pull) (record-calls-and-return t))
+            ((symbol-function 'autosync-git--timer-exists) (always-nil))
             ((symbol-function 'run-with-timer) (record-calls-and-return t)))
-    (autosync-magit--pull-on-timer "/dir")
+    (autosync-git--pull-on-timer "/dir")
     (should
      (equal (list (list "/dir")
-                  (list 1234 nil #'autosync-magit--pull-on-timer "/dir"))
+                  (list 1234 nil #'autosync-git--pull-on-timer "/dir"))
             call-recorder))))
 
-(ert-deftest autosync-magit--pull-on-timer--no-timer-when-exists ()
+(ert-deftest autosync-git--pull-on-timer--no-timer-when-exists ()
   "Test that run-with-timer is not called when a timer already exists."
   (cl-letf (((symbol-value 'call-recorder) nil)
-            ((symbol-value 'autosync-magit--sync-alist)
-             (list (cons "/dir" (autosync-magit--sync-create
+            ((symbol-value 'autosync-git--sync-alist)
+             (list (cons "/dir" (autosync-git--sync-create
                                  :last-pull (seconds-to-time 0)
                                  :next-push (seconds-to-time 0)
                                  :timer 1234))))
-            ((symbol-function 'autosync-magit--throttle-pull) (record-calls-and-return t))
-            ((symbol-function 'autosync-magit--timer-exists) (always-return t))
+            ((symbol-function 'autosync-git--throttle-pull) (record-calls-and-return t))
+            ((symbol-function 'autosync-git--timer-exists) (always-return t))
             ((symbol-function 'run-with-timer) (record-calls-and-return t)))
-    (autosync-magit--pull-on-timer "/dir")
+    (autosync-git--pull-on-timer "/dir")
     (should
      (equal (list (list "/dir"))
             call-recorder))))
 
-(ert-deftest autosync-magit-mode--first-time ()
+(ert-deftest autosync-git-mode--first-time ()
   (cl-letf (((symbol-value 'call-recorder) nil)
-            ((symbol-value 'autosync-magit--sync-alist) nil)
-            ((symbol-value 'autosync-magit-pull-timer) 123)
+            ((symbol-value 'autosync-git--sync-alist) nil)
+            ((symbol-value 'autosync-git-pull-timer) 123)
             ((symbol-function 'magit-toplevel) (always-return "/dir"))
-            ((symbol-function 'autosync-magit--pull-on-timer) (record-calls-and-return t))
-            ((symbol-function 'autosync-magit--pull-when-visiting) (record-calls-and-return t))
+            ((symbol-function 'autosync-git--pull-on-timer) (record-calls-and-return t))
+            ((symbol-function 'autosync-git--pull-when-visiting) (record-calls-and-return t))
             ((symbol-function 'add-hook)  (record-calls-and-return t))
             ((symbol-function 'remove-hook)  (record-calls-and-return t)))
     (with-temp-buffer
-      (autosync-magit-mode)
+      (autosync-git-mode)
       (should
-       (equal autosync-magit--sync-alist
+       (equal autosync-git--sync-alist
               (list (cons "/dir"
-                          (autosync-magit--sync-create
+                          (autosync-git--sync-create
                            :last-pull (seconds-to-time 0)
                            :next-push (seconds-to-time 0)
-                           :timer autosync-magit-pull-timer)))))
+                           :timer autosync-git-pull-timer)))))
       (should (equal
                (list (list "/dir")
-                     (list 'after-save-hook #'autosync-magit--push-after-save nil t))
+                     (list 'after-save-hook #'autosync-git--push-after-save nil t))
                call-recorder)))))
 
-(ert-deftest autosync-magit-mode--next-time ()
+(ert-deftest autosync-git-mode--next-time ()
   (cl-letf (((symbol-value 'call-recorder) nil)
-            ((symbol-value 'autosync-magit--sync-alist)
+            ((symbol-value 'autosync-git--sync-alist)
              (list (cons "/dir"
-                         (autosync-magit--sync-create
+                         (autosync-git--sync-create
                           :last-pull (seconds-to-time 0)
                           :next-push (seconds-to-time 0)
-                          :timer autosync-magit-pull-timer))))
-            ((symbol-value 'autosync-magit-pull-timer) 123)
+                          :timer autosync-git-pull-timer))))
+            ((symbol-value 'autosync-git-pull-timer) 123)
             ((symbol-function 'magit-toplevel) (always-return "/dir"))
-            ((symbol-function 'autosync-magit--pull-on-timer) (record-calls-and-return t))
-            ((symbol-function 'autosync-magit--pull-when-visiting) (record-calls-and-return t))
+            ((symbol-function 'autosync-git--pull-on-timer) (record-calls-and-return t))
+            ((symbol-function 'autosync-git--pull-when-visiting) (record-calls-and-return t))
             ((symbol-function 'add-hook)  (record-calls-and-return t))
             ((symbol-function 'remove-hook)  (record-calls-and-return t)))
     (with-temp-buffer
-      (autosync-magit-mode)
+      (autosync-git-mode)
       (should (equal
                (list (list "/dir")
-                     (list 'after-save-hook #'autosync-magit--push-after-save nil t))
+                     (list 'after-save-hook #'autosync-git--push-after-save nil t))
                call-recorder)))))
 
-(ert-deftest autosync-magit-mode--not-repo ()
+(ert-deftest autosync-git-mode--not-repo ()
   (cl-letf (((symbol-value 'call-recorder) nil)
-            ((symbol-value 'autosync-magit--sync-alist) nil)
-            ((symbol-value 'autosync-magit-pull-timer) 123)
+            ((symbol-value 'autosync-git--sync-alist) nil)
+            ((symbol-value 'autosync-git-pull-timer) 123)
             ((symbol-function 'magit-toplevel) (always-return nil))
-            ((symbol-function 'autosync-magit--pull-on-timer) (record-calls-and-return t))
-            ((symbol-function 'autosync-magit--pull-when-visiting) (record-calls-and-return t))
+            ((symbol-function 'autosync-git--pull-on-timer) (record-calls-and-return t))
+            ((symbol-function 'autosync-git--pull-when-visiting) (record-calls-and-return t))
             ((symbol-function 'add-hook)  (record-calls-and-return t))
             ((symbol-function 'remove-hook)  (record-calls-and-return t)))
     (with-temp-buffer
-      (autosync-magit-mode)
+      (autosync-git-mode)
       (should (equal
                (list
-                (list 'after-save-hook #'autosync-magit--push-after-save t))
+                (list 'after-save-hook #'autosync-git--push-after-save t))
                call-recorder)))))
 
-(ert-deftest autosync-magit--timer-exists--no-timer ()
+(ert-deftest autosync-git--timer-exists--no-timer ()
   "Test that timer-exists returns nil when no matching timer exists."
   (cl-letf (((symbol-value 'timer-list) nil))
-    (should-not (autosync-magit--timer-exists "/dir"))))
+    (should-not (autosync-git--timer-exists "/dir"))))
 
-(ert-deftest autosync-magit--timer-exists--empty-timer-list ()
+(ert-deftest autosync-git--timer-exists--empty-timer-list ()
   "Test that timer-exists returns nil with empty timer-list."
   (cl-letf (((symbol-value 'timer-list) '()))
-    (should-not (autosync-magit--timer-exists "/dir"))))
+    (should-not (autosync-git--timer-exists "/dir"))))
 
-(ert-deftest autosync-magit--timer-exists--different-function ()
+(ert-deftest autosync-git--timer-exists--different-function ()
   "Test that timer-exists returns nil when timer has different function."
   (let ((timer (run-with-timer 1000 nil #'ignore "/dir")))
     (unwind-protect
-        (should-not (autosync-magit--timer-exists "/dir"))
+        (should-not (autosync-git--timer-exists "/dir"))
       (cancel-timer timer))))
 
-(ert-deftest autosync-magit--timer-exists--different-repo ()
+(ert-deftest autosync-git--timer-exists--different-repo ()
   "Test that timer-exists returns nil when timer has different repo-dir."
-  (let ((timer (run-with-timer 1000 nil #'autosync-magit--pull-on-timer "/other-dir")))
+  (let ((timer (run-with-timer 1000 nil #'autosync-git--pull-on-timer "/other-dir")))
     (unwind-protect
-        (should-not (autosync-magit--timer-exists "/dir"))
+        (should-not (autosync-git--timer-exists "/dir"))
       (cancel-timer timer))))
 
-(ert-deftest autosync-magit--timer-exists--matching-timer ()
+(ert-deftest autosync-git--timer-exists--matching-timer ()
   "Test that timer-exists returns non-nil when matching timer exists."
-  (let ((timer (run-with-timer 1000 nil #'autosync-magit--pull-on-timer "/dir")))
+  (let ((timer (run-with-timer 1000 nil #'autosync-git--pull-on-timer "/dir")))
     (unwind-protect
-        (should (autosync-magit--timer-exists "/dir"))
+        (should (autosync-git--timer-exists "/dir"))
       (cancel-timer timer))))
 
-(ert-deftest autosync-magit--timer-exists--multiple-timers ()
+(ert-deftest autosync-git--timer-exists--multiple-timers ()
   "Test that timer-exists finds correct timer among multiple timers."
   (let ((timer1 (run-with-timer 1000 nil #'ignore "/dir"))
-        (timer2 (run-with-timer 1000 nil #'autosync-magit--pull-on-timer "/other-dir"))
-        (timer3 (run-with-timer 1000 nil #'autosync-magit--pull-on-timer "/dir")))
+        (timer2 (run-with-timer 1000 nil #'autosync-git--pull-on-timer "/other-dir"))
+        (timer3 (run-with-timer 1000 nil #'autosync-git--pull-on-timer "/dir")))
     (unwind-protect
-        (should (autosync-magit--timer-exists "/dir"))
+        (should (autosync-git--timer-exists "/dir"))
       (cancel-timer timer1)
       (cancel-timer timer2)
       (cancel-timer timer3))))
 
-(provide 'autosync-magit-tests)
-;;; autosync-magit-tests.el ends here
+(provide 'autosync-git-tests)
+;;; autosync-git-tests.el ends here

@@ -5,7 +5,7 @@
 
 RM = rm -f
 EMACS = emacs
-SRC = autosync-magit.el
+SRC = autosync-git.el
 BYTEC = $(SRC)c
 
 # Should pull the following dependencies:
@@ -42,7 +42,7 @@ test: $(BYTEC)
 	@echo "Testing $<"
 	$(BATCH) \
 		-L . \
-		-l autosync-magit-tests.el \
+		-l autosync-git-tests.el \
 		-f ert-run-tests-batch-and-exit
 
 purge: clean
