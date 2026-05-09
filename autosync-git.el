@@ -5,7 +5,7 @@
 ;; Author: Sylvain Bougerel <sylvain.bougerel.devel@gmail.com>
 ;; Maintainer: Sylvain Bougerel <sylvain.bougerel.devel@gmail.com>
 ;; Version: 0.5.0
-;; Package-Requires: ((emacs "28.1") (magit "4.3.8"))
+;; Package-Requires: ((emacs "28.1"))
 ;; Keywords: convenience tools git
 ;; URL: https://github.com/sbougerel/autosync-git
 
@@ -30,12 +30,12 @@
 ;; [![CI Result](https://github.com/sbougerel/autosync-git/actions/workflows/makefile.yml/badge.svg)](https://github.com/sbougerel/autosync-git/actions)
 ;;
 ;; Autosync-Git provides a minor mode to automatically synchronize a local git
-;; repository branch with its upstream, using Magit.  It is intended to be used
-;; exceptionally: when git is used solely to synchronize private content between
-;; devices or personal backups.  With this use case, there is typically no need
-;; to create branches, and all changes can be pushed to the remote as soon as
-;; they are committed.  The author created it to synchronize their personal
-;; notes between different devices.
+;; repository branch with its upstream by invoking `git' directly.  It is
+;; intended to be used exceptionally: when git is used solely to synchronize
+;; private content between devices or personal backups.  With this use case,
+;; there is typically no need to create branches, and all changes can be pushed
+;; to the remote as soon as they are committed.  The author created it to
+;; synchronize their personal notes between different devices.
 ;;
 ;; Autosync-Git should never be used for other use cases and especially not
 ;; for team settings.
@@ -55,9 +55,6 @@
 ;; commit.  The `autosync-git-pull-timer' controls the period between
 ;; background pull attempts, in seconds.  See the documentation of each variable
 ;; for more details.
-;;
-;; This is a simple package, that lends much of its functionality to `magit'
-;; that does most of the work asynchronously under the hood.
 
 ;;; Installation:
 ;;
@@ -122,8 +119,7 @@
 ;;; Code:
 
 (require 'cl-lib)
-(require 'magit-git)
-(require 'magit-process)
+(require 'subr-x)
 
 ;; Definitions:
 (defgroup autosync-git nil
@@ -205,24 +201,82 @@ Stores timing about the pull and push operations."
 Do not modify this variable directly.  Visit files in buffers with
 `autosync-git-mode' turned on or use `autosync-git-set' instead.")
 
-;; Implementation:
-(defmacro autosync-git--after (process &rest body)
-  "Run BODY after async PROCESS."
-  (declare (indent 1) (debug t))
-  `(set-process-sentinel ,process (lambda (&rest _) ,@body)))
+;; Process layer:
+;;
+;; Two thin wrappers around `process-file' (synchronous) and `make-process'
+;; (asynchronous).  Both take REPO-DIR explicitly and rely on
+;; `default-directory' binding rather than the buffer's; this keeps every
+;; invocation free of buffer-local side effects.
 
-(defmacro autosync-git--with-repo (repo-dir &rest body)
-  "Run BODY in a temporary buffer where current directory is REPO-DIR.
+(defun autosync-git--process-buffer (repo-dir)
+  "Return the diagnostic process buffer for REPO-DIR, creating it if needed."
+  (get-buffer-create (format "*autosync-git: %s*" repo-dir)))
 
-Avoid relying on file-visiting buffers that may be killed before body
-runs.  Ensure directory local variables are loaded.  Return BODY's
-return value."
-  (declare (indent 1) (debug t))
-  `(with-temp-buffer
-     (let ((default-directory ,repo-dir)
-           (enable-dir-local-variables t))
-       (hack-dir-local-variables-non-file-buffer)
-       ,@body)))
+(defun autosync-git--call (repo-dir &rest args)
+  "Run \"git ARGS\" synchronously in REPO-DIR.
+Return a cons (EXIT-CODE . OUTPUT) where OUTPUT is trimmed stdout."
+  (with-temp-buffer
+    (let* ((default-directory (file-name-as-directory repo-dir))
+           (exit (apply #'process-file "git" nil t nil args)))
+      (cons exit (string-trim (buffer-string))))))
+
+(defun autosync-git--call-async (repo-dir done &rest args)
+  "Run \"git ARGS\" asynchronously in REPO-DIR.
+Call DONE with the integer exit code when the process terminates.
+Return the process object."
+  (let* ((default-directory (file-name-as-directory repo-dir))
+         (proc (apply #'start-file-process
+                      "autosync-git"
+                      (autosync-git--process-buffer repo-dir)
+                      "git" args)))
+    (set-process-sentinel
+     proc
+     (lambda (p _event)
+       (when (memq (process-status p) '(exit signal))
+         (funcall done (process-exit-status p)))))
+    proc))
+
+(defun autosync-git--toplevel (&optional path)
+  "Return the toplevel of the git repository containing PATH, or nil.
+PATH defaults to `default-directory'."
+  (let ((result (autosync-git--call (or path default-directory)
+                                    "rev-parse" "--show-toplevel")))
+    (when (zerop (car result))
+      (file-name-as-directory (cdr result)))))
+
+(defun autosync-git--upstream-ancestry (repo-dir)
+  "Return the ancestry between HEAD and @{upstream} in REPO-DIR.
+One of: `in-sync', `behind', `ahead', `diverged', `no-upstream'."
+  (if (not (zerop (car (autosync-git--call
+                        repo-dir "rev-parse" "--verify" "--quiet" "@{upstream}"))))
+      'no-upstream
+    (let ((head-anc-up (zerop (car (autosync-git--call
+                                    repo-dir "merge-base" "--is-ancestor"
+                                    "HEAD" "@{upstream}"))))
+          (up-anc-head (zerop (car (autosync-git--call
+                                    repo-dir "merge-base" "--is-ancestor"
+                                    "@{upstream}" "HEAD")))))
+      (cond ((and head-anc-up up-anc-head) 'in-sync)
+            (head-anc-up 'behind)
+            (up-anc-head 'ahead)
+            (t 'diverged)))))
+
+(defun autosync-git--unmerged-p (repo-dir)
+  "Return non-nil if there are unmerged paths in REPO-DIR."
+  (not (string-empty-p
+        (cdr (autosync-git--call repo-dir
+                                 "diff" "--name-only" "--diff-filter=U")))))
+
+(defun autosync-git--needs-push-p (repo-dir)
+  "Return non-nil if HEAD has commits that are not yet on @{push} in REPO-DIR.
+Return nil when @{push} is undefined or already at HEAD."
+  (let ((push-rev (autosync-git--call repo-dir "rev-parse" "--verify" "--quiet" "@{push}"))
+        (head-rev (autosync-git--call repo-dir "rev-parse" "--verify" "--quiet" "HEAD")))
+    (and (zerop (car push-rev))
+         (zerop (car head-rev))
+         (not (string= (cdr push-rev) (cdr head-rev))))))
+
+;; Operations:
 
 ;;;###autoload
 (defun autosync-git-pull (path)
@@ -232,24 +286,25 @@ This interactive function is not throttled, it is executed as soon as it
 called.  Merges are synchronous, to minimize possible conflicts with
 files modified by Emacs in the repository."
   (interactive "D")
-  (let ((repo-dir (magit-toplevel path)))
+  (let ((repo-dir (autosync-git--toplevel path)))
     (if (not repo-dir)
         (message "Autosync-Git: \"%s\" is not a path to a git repository" path)
       (when-let ((sync (cdr (assoc repo-dir autosync-git--sync-alist))))
         (setf (autosync-git--sync-last-pull sync) (current-time)))
-      (autosync-git--after
-          (autosync-git--with-repo repo-dir
-            (magit-run-git-async "fetch"))
-        (autosync-git--with-repo repo-dir
-          (when (not (magit-rev-ancestor-p "@{upstream}" "HEAD"))
-            (let ((exit-code (magit-run-git "merge"))) ;; synchronous
-              (cond
-               ((and (numberp exit-code) (zerop exit-code))
-                (run-hooks 'autosync-git-after-merge-hook))
-               ((magit-anything-unmerged-p)
-                (message "Autosync-Git: Merge conflict in %s - please resolve manually" repo-dir))
-               (t
-                (message "Autosync-Git: Merge failed in %s" repo-dir))))))))))
+      (autosync-git--call-async
+       repo-dir
+       (lambda (_)
+         (when (memq (autosync-git--upstream-ancestry repo-dir)
+                     '(behind diverged))
+           (let ((exit-code (car (autosync-git--call repo-dir "merge"))))
+             (cond
+              ((zerop exit-code)
+               (run-hooks 'autosync-git-after-merge-hook))
+              ((autosync-git--unmerged-p repo-dir)
+               (message "Autosync-Git: Merge conflict in %s - please resolve manually" repo-dir))
+              (t
+               (message "Autosync-Git: Merge failed in %s" repo-dir))))))
+       "fetch"))))
 
 ;;;###autoload
 (defun autosync-git-push (path message)
@@ -258,18 +313,19 @@ files modified by Emacs in the repository."
 This interactive function is not debounced, it is executed
 asynchronously, as soon as it called."
   (interactive "D\nMCommit message: ")
-  (let ((repo-dir (magit-toplevel path)))
+  (let ((repo-dir (autosync-git--toplevel path)))
     (if (not repo-dir)
         (message "Autosync-Git: \"%s\" is not a path to a git repository" path)
-      (autosync-git--after
-          (autosync-git--with-repo repo-dir
-            (magit-run-git-async "add" "-A"))
-        (autosync-git--after
-            (autosync-git--with-repo repo-dir
-              (magit-run-git-async "commit" "-a" "-m" message))
-          (autosync-git--with-repo repo-dir
-            (when (not (magit-rev-eq "@{push}" "HEAD"))
-              (magit-run-git-async "push"))))))))
+      (autosync-git--call-async
+       repo-dir
+       (lambda (_)
+         (autosync-git--call-async
+          repo-dir
+          (lambda (_)
+            (when (autosync-git--needs-push-p repo-dir)
+              (autosync-git--call-async repo-dir #'ignore "push")))
+          "commit" "-a" "-m" message))
+       "add" "-A"))))
 
 (defun autosync-git--throttle-pull (repo-dir)
   "Pull change from upstream into REPO-DIR."
@@ -310,7 +366,7 @@ does, returns t."
 
 (defun autosync-git--push-after-save (&optional _)
   "Push change upstream with a debounce."
-  (let* ((repo-dir (magit-toplevel))
+  (let* ((repo-dir (autosync-git--toplevel))
          (sync (cdr (assoc repo-dir autosync-git--sync-alist))))
     (when (and sync
                (time-less-p
@@ -339,7 +395,7 @@ Customize these values to your liking."
   :lighter " ↕"
   :group 'autosync-git
   (if autosync-git-mode
-      (let ((repo-dir (magit-toplevel)))
+      (let ((repo-dir (autosync-git--toplevel)))
         (if (not repo-dir)
             (autosync-git-mode -1)
           (let ((sync (cdr (assoc repo-dir autosync-git--sync-alist))))

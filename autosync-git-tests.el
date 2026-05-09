@@ -1,4 +1,4 @@
-;;; autosync-git.el --- Automatically synchronize content with upstream via magit -*- lexical-binding: t; -*-
+;;; autosync-git-tests.el --- Tests for autosync-git -*- lexical-binding: t; -*-
 ;;
 ;; Copyright (C) 2023 Sylvain Bougerel
 ;;
@@ -31,8 +31,6 @@
 
 (require 'cl-lib)
 (require 'ert)
-(require 'magit-git) ;; load early so it's symbols can be mocked
-(require 'magit-process) ;; load early so it's symbols can be mocked
 
 (defun always-return (value)
   "Return VALUE always, regardless of its arguments."
@@ -62,16 +60,36 @@
           (setq call-recorder (list args))))
     value))
 
+(defun record-rest-and-return (skip value)
+  "Return VALUE; record argument tail after SKIP positions.
+Lets a stub for a helper that takes a REPO-DIR (and possibly a
+callback) record only the trailing git arguments, so the recorded
+sequence matches the git command line that was issued."
+  (lambda (&rest args)
+    (let ((rest (nthcdr skip args)))
+      (if (consp call-recorder)
+          (setcdr (last call-recorder) (list rest))
+        (setq call-recorder (list rest))))
+    value))
+
+(defun stub-call-async-success ()
+  "Stub for `autosync-git--call-async' that records git args and succeeds.
+The stub records (rest of args after repo-dir and done callback) and
+synchronously calls the done callback with exit code 0."
+  (lambda (_repo done &rest git-args)
+    (if (consp call-recorder)
+        (setcdr (last call-recorder) (list git-args))
+      (setq call-recorder (list git-args)))
+    (funcall done 0)
+    nil))
+
 (require 'autosync-git)
 
 (ert-deftest autosync-git-push--ahead ()
   (cl-letf (((symbol-value 'call-recorder) nil)
-            ((symbol-function 'hack-dir-local-variables-non-file-buffer) #'ignore)
-            ((symbol-function 'magit-toplevel) (always-return "/dir"))
-            ((symbol-function 'magit-run-git-async) (record-calls-and-return nil))
-            ((symbol-function 'magit-rev-eq) (always-nil))
-            ((symbol-function 'set-process-sentinel)
-             (lambda (process sentinel) process (funcall sentinel))))
+            ((symbol-function 'autosync-git--toplevel) (always-return "/dir"))
+            ((symbol-function 'autosync-git--call-async) (stub-call-async-success))
+            ((symbol-function 'autosync-git--needs-push-p) (always-return t)))
     (autosync-git-push "/dir" "other message")
     (should
      (equal '(("add" "-A")
@@ -81,12 +99,9 @@
 
 (ert-deftest autosync-git-push--no-changes ()
   (cl-letf (((symbol-value 'call-recorder) nil)
-            ((symbol-function 'hack-dir-local-variables-non-file-buffer) #'ignore)
-            ((symbol-function 'magit-toplevel) (always-return "/dir"))
-            ((symbol-function 'magit-run-git-async) (record-calls-and-return nil))
-            ((symbol-function 'magit-rev-eq) (always-return t))
-            ((symbol-function 'set-process-sentinel)
-             (lambda (process sentinel) process (funcall sentinel))))
+            ((symbol-function 'autosync-git--toplevel) (always-return "/dir"))
+            ((symbol-function 'autosync-git--call-async) (stub-call-async-success))
+            ((symbol-function 'autosync-git--needs-push-p) (always-nil)))
     (autosync-git-push "/dir" "other message")
     (should
      (equal '(("add" "-A")
@@ -100,13 +115,10 @@
                                  :last-pull (seconds-to-time 0)
                                  :next-push (seconds-to-time 0)
                                  :timer 0))))
-            ((symbol-function 'hack-dir-local-variables-non-file-buffer) #'ignore)
-            ((symbol-function 'magit-toplevel) (always-return "/dir"))
-            ((symbol-function 'magit-run-git-async) (record-calls-and-return nil))
-            ((symbol-function 'magit-run-git) (record-calls-and-return 0))
-            ((symbol-function 'magit-rev-ancestor-p) (always-nil))
-            ((symbol-function 'set-process-sentinel)
-             (lambda (process sentinel) process (funcall sentinel)))
+            ((symbol-function 'autosync-git--toplevel) (always-return "/dir"))
+            ((symbol-function 'autosync-git--call-async) (stub-call-async-success))
+            ((symbol-function 'autosync-git--call) (record-rest-and-return 1 (cons 0 "")))
+            ((symbol-function 'autosync-git--upstream-ancestry) (always-return 'behind))
             ((symbol-function 'run-hooks) (record-only-and-return
                                            t
                                            '((autosync-git-after-merge-hook)))))
@@ -126,13 +138,10 @@
                                  :last-pull (seconds-to-time 0)
                                  :next-push (seconds-to-time 0)
                                  :timer 0))))
-            ((symbol-function 'hack-dir-local-variables-non-file-buffer) #'ignore)
-            ((symbol-function 'magit-toplevel) (always-return "/dir"))
-            ((symbol-function 'magit-run-git-async) (record-calls-and-return nil))
-            ((symbol-function 'magit-run-git) (record-calls-and-return nil))
-            ((symbol-function 'magit-rev-ancestor-p) (always-return t))
-            ((symbol-function 'set-process-sentinel)
-             (lambda (process sentinel) process (funcall sentinel)))
+            ((symbol-function 'autosync-git--toplevel) (always-return "/dir"))
+            ((symbol-function 'autosync-git--call-async) (stub-call-async-success))
+            ((symbol-function 'autosync-git--call) (record-rest-and-return 1 (cons 0 "")))
+            ((symbol-function 'autosync-git--upstream-ancestry) (always-return 'in-sync))
             ((symbol-function 'run-hooks) (record-only-and-return
                                            t
                                            '((autosync-git-after-merge-hook)))))
@@ -151,14 +160,11 @@
                                  :last-pull (seconds-to-time 0)
                                  :next-push (seconds-to-time 0)
                                  :timer 0))))
-            ((symbol-function 'hack-dir-local-variables-non-file-buffer) #'ignore)
-            ((symbol-function 'magit-toplevel) (always-return "/dir"))
-            ((symbol-function 'magit-run-git-async) (record-calls-and-return nil))
-            ((symbol-function 'magit-run-git) (record-calls-and-return 1))
-            ((symbol-function 'magit-rev-ancestor-p) (always-nil))
-            ((symbol-function 'magit-anything-unmerged-p) (always-return t))
-            ((symbol-function 'set-process-sentinel)
-             (lambda (process sentinel) process (funcall sentinel)))
+            ((symbol-function 'autosync-git--toplevel) (always-return "/dir"))
+            ((symbol-function 'autosync-git--call-async) (stub-call-async-success))
+            ((symbol-function 'autosync-git--call) (record-rest-and-return 1 (cons 1 "")))
+            ((symbol-function 'autosync-git--upstream-ancestry) (always-return 'behind))
+            ((symbol-function 'autosync-git--unmerged-p) (always-return t))
             ((symbol-function 'message) (record-calls-and-return nil))
             ((symbol-function 'run-hooks) (record-only-and-return
                                            t
@@ -178,14 +184,11 @@
                                  :last-pull (seconds-to-time 0)
                                  :next-push (seconds-to-time 0)
                                  :timer 0))))
-            ((symbol-function 'hack-dir-local-variables-non-file-buffer) #'ignore)
-            ((symbol-function 'magit-toplevel) (always-return "/dir"))
-            ((symbol-function 'magit-run-git-async) (record-calls-and-return nil))
-            ((symbol-function 'magit-run-git) (record-calls-and-return 1))
-            ((symbol-function 'magit-rev-ancestor-p) (always-nil))
-            ((symbol-function 'magit-anything-unmerged-p) (always-nil))
-            ((symbol-function 'set-process-sentinel)
-             (lambda (process sentinel) process (funcall sentinel)))
+            ((symbol-function 'autosync-git--toplevel) (always-return "/dir"))
+            ((symbol-function 'autosync-git--call-async) (stub-call-async-success))
+            ((symbol-function 'autosync-git--call) (record-rest-and-return 1 (cons 1 "")))
+            ((symbol-function 'autosync-git--upstream-ancestry) (always-return 'behind))
+            ((symbol-function 'autosync-git--unmerged-p) (always-nil))
             ((symbol-function 'message) (record-calls-and-return nil))
             ((symbol-function 'run-hooks) (record-only-and-return
                                            t
@@ -197,7 +200,6 @@
               ("Autosync-Git: Merge failed in %s" "/dir"))
             call-recorder))))
 
-;; Add push bounce / pull bounce tests
 (ert-deftest autosync-git--throttle-pull--elapsed ()
   (cl-letf (((symbol-value 'call-recorder) nil)
             ((symbol-value 'autosync-git--sync-alist)
@@ -232,7 +234,7 @@
                                  :last-pull (seconds-to-time 0)
                                  :next-push (seconds-to-time 0)
                                  :timer 0))))
-            ((symbol-function 'magit-toplevel) (always-return "/dir"))
+            ((symbol-function 'autosync-git--toplevel) (always-return "/dir"))
             ((symbol-function 'run-with-timer) (record-calls-and-return t)))
     (autosync-git--push-after-save)
     (should
@@ -249,7 +251,7 @@
                                  :next-push (seconds-to-time (time-add (current-time)
                                                                        autosync-git-push-debounce))
                                  :timer 0))))
-            ((symbol-function 'magit-toplevel) (always-return "/dir"))
+            ((symbol-function 'autosync-git--toplevel) (always-return "/dir"))
             ((symbol-function 'run-with-timer) (record-calls-and-return t)))
     (autosync-git--push-after-save)
     (should
@@ -292,7 +294,7 @@
   (cl-letf (((symbol-value 'call-recorder) nil)
             ((symbol-value 'autosync-git--sync-alist) nil)
             ((symbol-value 'autosync-git-pull-timer) 123)
-            ((symbol-function 'magit-toplevel) (always-return "/dir"))
+            ((symbol-function 'autosync-git--toplevel) (always-return "/dir"))
             ((symbol-function 'autosync-git--pull-on-timer) (record-calls-and-return t))
             ((symbol-function 'autosync-git--pull-when-visiting) (record-calls-and-return t))
             ((symbol-function 'add-hook)  (record-calls-and-return t))
@@ -320,7 +322,7 @@
                           :next-push (seconds-to-time 0)
                           :timer autosync-git-pull-timer))))
             ((symbol-value 'autosync-git-pull-timer) 123)
-            ((symbol-function 'magit-toplevel) (always-return "/dir"))
+            ((symbol-function 'autosync-git--toplevel) (always-return "/dir"))
             ((symbol-function 'autosync-git--pull-on-timer) (record-calls-and-return t))
             ((symbol-function 'autosync-git--pull-when-visiting) (record-calls-and-return t))
             ((symbol-function 'add-hook)  (record-calls-and-return t))
@@ -336,7 +338,7 @@
   (cl-letf (((symbol-value 'call-recorder) nil)
             ((symbol-value 'autosync-git--sync-alist) nil)
             ((symbol-value 'autosync-git-pull-timer) 123)
-            ((symbol-function 'magit-toplevel) (always-return nil))
+            ((symbol-function 'autosync-git--toplevel) (always-return nil))
             ((symbol-function 'autosync-git--pull-on-timer) (record-calls-and-return t))
             ((symbol-function 'autosync-git--pull-when-visiting) (record-calls-and-return t))
             ((symbol-function 'add-hook)  (record-calls-and-return t))

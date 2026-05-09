@@ -8,11 +8,7 @@ EMACS = emacs
 SRC = autosync-git.el
 BYTEC = $(SRC)c
 
-# Should pull the following dependencies:
-#   dash
-#   with-editor
-#   magit-section
-DEPS := cl-lib magit
+DEPS := cl-lib
 
 PKGCACHE := $(abspath $(PWD)/package-cache)
 
