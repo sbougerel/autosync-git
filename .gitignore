@@ -2,6 +2,7 @@
 .idea
 *.log
 *.elc
+.cache/
 tmp/
 site-lisp/
 package-cache/

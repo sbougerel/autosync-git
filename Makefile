@@ -1,7 +1,6 @@
 .POSIX:
 .PHONY: all compile test clean purge
 .SUFFIXES: .el .elc
-.INTERMEDIATE: make-readme-markdown.el
 
 RM = rm -f
 EMACS = emacs
@@ -27,7 +26,7 @@ INIT_PACKAGES="(progn \
       (package-install pkg))) \
   (unless package-archive-contents (package-refresh-contents)) \
   )"
- 
+
 BATCH = $(EMACS) -Q --batch --eval $(INIT_PACKAGES)
 
 all: compile
@@ -47,10 +46,11 @@ purge: clean
 clean:
 	$(RM) $(BYTEC)
 
-README.md: make-readme-markdown.el $(SRC)
+README.md: .cache/make-readme-markdown.el $(SRC)
 	$(EMACS) -Q --script $< <$(SRC) >$@
 
-make-readme-markdown.el:
+.cache/make-readme-markdown.el:
+	mkdir .cache
 	curl -L -o $@ https://raw.github.com/mgalgs/make-readme-markdown/master/make-readme-markdown.el
 
 .el.elc:
