@@ -54,6 +54,8 @@ purge: clean
 clean:
 	$(RM) $(BYTEC)
 
+docs: README.md
+
 README.md: .cache/make-readme-markdown.el $(SRC)
 	$(EMACS) -Q --script $< <$(SRC) >$@
 

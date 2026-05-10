@@ -3,8 +3,8 @@
 *Automatically synchronize a git repository with its upstream*
 
 ---
-
 [![License GPLv3](https://img.shields.io/badge/license-GPL_v3-green.svg)](http://www.gnu.org/licenses/gpl-3.0.html)
+
 [![CI Result](https://github.com/sbougerel/autosync-git/actions/workflows/makefile.yml/badge.svg)](https://github.com/sbougerel/autosync-git/actions)
 
 Autosync-Git automatically synchronizes a local git repository branch with
@@ -30,18 +30,16 @@ independently of the mode:
 
 ### Pull strategy
 
-The hardest decision in a personal-sync workflow is what to do when the local
-branch and upstream have diverged but do not actually conflict (e.g. you
-edited file A on one device and file B on another).  `autosync-git-pull` uses
-a probe-then-rebase strategy:
+Autosync-git tries its best to pull from upstream without disturbing your
+current work.  `autosync-git-pull` uses a probe-then-rebase strategy:
 
 1. Fetch from upstream.
 2. Compare HEAD to @{upstream}.  In-sync or ahead: nothing to do.
-   Behind: fast-forward.  Diverged: probe before acting.
+   Behind: fast-forward (conflict-free).  Diverged: probe before acting.
 3. The probe uses `git merge-tree` to perform a 3-way merge in memory
    without touching the working tree.  If the probe is conflict-free,
-   the configured operation runs.  Otherwise the operation is refused
-   and the working tree is left untouched.
+   the configured operation (rebase or merge) runs.  Otherwise the
+   operation is cancelled and the working tree is left untouched.
 
 The default operation is rebase, controlled by `autosync-git-pull-style`; set
 it to `merge` to create a merge commit instead.  Rebase is the default
@@ -62,7 +60,7 @@ Activate the mode in a repository via `.dir-locals.el`.  Example:
 
     ((nil . ((autosync-git-commit-message . "My commit message")
              (autosync-git-pull-timer . 300)
-             (autosync-git-pull-style . rebase)
+             (autosync-git-pull-style . rebase) ; optionally
              (mode . autosync-git))))
 
 This activates `autosync-git-mode` in any file visited under the directory
@@ -72,15 +70,15 @@ shortly after, and remote changes are pulled periodically.
 
 See each variable's docstring for tuning.
 
-### Defensive activation
+### Defensive programatic activation
 
-`autosync-git-mode` refuses to activate unless a `.dir-locals.el` (or
-`.dir-locals-2.el`) in or above the buffer's directory contains `(mode
-. autosync-git)`.  This guards against tooling that misapplies dir-locals
-across unrelated buffers, which has been observed to silently trigger
-automatic git operations on the wrong repository.  Set
-`autosync-git-skip-dir-locals-check` to `t` to bypass this when activating
-the mode programmatically without `.dir-locals.el`.
+`autosync-git-mode` will always activate when invoked interactively, but will
+refuse to activate unless a `.dir-locals.el` (or `.dir-locals-2.el`) in or
+above the buffer's directory contains `(mode . autosync-git)`.  This guards
+against tooling that misapplies dir-locals across unrelated buffers, which
+has been observed to silently trigger automatic git operations on the wrong
+repository.  Set `autosync-git-skip-dir-locals-check` to `t` to bypass this
+when activating the mode programmatically without `.dir-locals.el`.
 
 ### Installation
 
@@ -105,6 +103,8 @@ Then add the following to `~/.doom.d/config.el`:
     (use-package! autosync-git)
 
 Then run `doom sync` to install it.
+
+A MELPA submission is planned for the future.
 
 ### Change Log
 
