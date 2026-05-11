@@ -150,7 +150,7 @@
 ;; `autosync-git-skip-dir-locals-check'.
 ;;
 ;; Variable rename: `autosync-magit-after-merge-hook' is now
-;; `autosync-git-after-pull-hook'.  The `autosync-git-after-merge-hook' symbol
+;; `autosync-git-after-pull-hook'.  The `autosync-magit-after-merge-hook' symbol
 ;; remains as an obsolete alias.
 ;;
 ;; 0.5.0 - Fixed a bug, added several improvements.
@@ -243,7 +243,7 @@ buffer-local value from the first save is used."
   :package-version '(autosync-git . "0.1.0"))
 
 (define-obsolete-variable-alias
-  'autosync-git-after-merge-hook
+  'autosync-magit-after-merge-hook
   'autosync-git-after-pull-hook
   "1.0.0")
 

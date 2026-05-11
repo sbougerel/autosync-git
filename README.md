@@ -131,7 +131,7 @@ misapplies dir-locals across buffers.  Override with
 `autosync-git-skip-dir-locals-check`.
 
 Variable rename: `autosync-magit-after-merge-hook` is now
-`autosync-git-after-pull-hook`.  The `autosync-git-after-merge-hook` symbol
+`autosync-git-after-pull-hook`.  The `autosync-magit-after-merge-hook` symbol
 remains as an obsolete alias.
 
 0.5.0 - Fixed a bug, added several improvements.
