@@ -521,7 +521,7 @@ possible values.  FORCE has the same meaning as in `autosync-git-pull'."
     ('diverged
      (autosync-git--run-diverged repo-dir force))
     ('no-upstream
-     (message "Autosync-Git: %s has no upstream configured" repo-dir)
+     (message "Autosync-Git: \"%s\" has no upstream configured" repo-dir)
      'failed)))
 
 (defun autosync-git--run-fast-forward (repo-dir)
@@ -531,10 +531,11 @@ on success or `failed' otherwise."
   (let ((exit (car (autosync-git--call repo-dir "merge" "--ff-only"))))
     (cond
      ((zerop exit)
+      (message "Autosync-Git: pulled \"%s\" (fast-forward)" repo-dir)
       (run-hooks 'autosync-git-after-pull-hook)
       'updated)
      (t
-      (message "Autosync-Git: Fast-forward failed in %s" repo-dir)
+      (message "Autosync-Git: Fast-forward failed in \"%s\"" repo-dir)
       'failed))))
 
 (defun autosync-git--run-diverged (repo-dir force)
@@ -543,7 +544,7 @@ Without FORCE, refuse to act when the probe predicts conflicts.  Return
 one of `updated', `refused', `conflicted', or `failed'."
   (if (and (not force) (not (autosync-git--probe-clean-p repo-dir)))
       (progn
-        (message "Autosync-Git: %s would conflict with upstream; \
+        (message "Autosync-Git: \"%s\" would conflict with upstream; \
 worktree left untouched (use C-u to force)" repo-dir)
         'refused)
     (autosync-git--run-pull-op repo-dir force)))
@@ -562,20 +563,21 @@ worktree and return `conflicted'.  Other non-zero exits return `failed'."
          (exit (car (apply #'autosync-git--call repo-dir cmd))))
     (cond
      ((zerop exit)
+      (message "Autosync-Git: pulled \"%s\" (%s)" repo-dir style)
       (run-hooks 'autosync-git-after-pull-hook)
       'updated)
      ((autosync-git--unmerged-p repo-dir)
       (cond
        (force
-        (message "Autosync-Git: Conflict in %s - resolve manually" repo-dir)
+        (message "Autosync-Git: Conflict in \"%s\" - resolve manually" repo-dir)
         'conflicted)
        (t
         (autosync-git--abort-pull-op repo-dir style)
-        (message "Autosync-Git: Conflict in %s - aborted, worktree restored"
+        (message "Autosync-Git: Conflict in \"%s\" - aborted, worktree restored"
                  repo-dir)
         'refused)))
      (t
-      (message "Autosync-Git: %s failed in %s" style repo-dir)
+      (message "Autosync-Git: %s failed in \"%s\"" style repo-dir)
       'failed))))
 
 (defun autosync-git--abort-pull-op (repo-dir style)
@@ -654,7 +656,11 @@ past @{push}.  All git invocations run asynchronously."
           repo-dir
           (lambda (_)
             (when (autosync-git--needs-push-p repo-dir)
-              (autosync-git--call-async repo-dir #'ignore "push")))
+              (autosync-git--call-async
+               repo-dir
+               (lambda (_)
+                 (message "Autosync-Git: pushed \"%s\"" path))
+               "push")))
           "commit" "-a" "-m" message))
        "add" "-A"))))
 

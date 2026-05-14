@@ -91,12 +91,15 @@ synchronously calls the done callback with exit code 0."
   (cl-letf (((symbol-value 'call-recorder) nil)
             ((symbol-function 'autosync-git--toplevel) (always-return "/dir"))
             ((symbol-function 'autosync-git--call-async) (stub-call-async-success))
-            ((symbol-function 'autosync-git--needs-push-p) (always-return t)))
+            ((symbol-function 'autosync-git--needs-push-p) (always-return t))
+            ((symbol-function 'message) (record-calls-and-return nil)))
     (autosync-git-push "/dir" "other message")
     (should
      (equal '(("add" "-A")
               ("commit" "-a" "-m" "other message")
-              ("push"))
+              ("push")
+              ("Autosync-Git: pushed \"%s\""
+               "/dir"))
             call-recorder))))
 
 (ert-deftest autosync-git-push--no-changes ()
@@ -126,11 +129,14 @@ synchronously calls the done callback with exit code 0."
             ((symbol-function 'autosync-git--upstream-ancestry) (always-return 'behind))
             ((symbol-function 'run-hooks) (record-only-and-return
                                            t
-                                           '((autosync-git-after-pull-hook)))))
+                                           '((autosync-git-after-pull-hook))))
+            ((symbol-function 'message) (record-calls-and-return nil)))
     (autosync-git-pull "/dir")
     (should
      (equal '(("fetch")
               ("merge" "--ff-only")
+              ("Autosync-Git: pulled \"%s\" (fast-forward)"
+               "/dir")
               (autosync-git-after-pull-hook))
             call-recorder))
     (should (not (equal (seconds-to-time 0)
@@ -188,11 +194,14 @@ synchronously calls the done callback with exit code 0."
             ((symbol-function 'autosync-git--probe-clean-p) (always-return t))
             ((symbol-function 'run-hooks) (record-only-and-return
                                            t
-                                           '((autosync-git-after-pull-hook)))))
+                                           '((autosync-git-after-pull-hook))))
+            ((symbol-function 'message) (record-calls-and-return nil)))
     (autosync-git-pull "/dir")
     (should
      (equal '(("fetch")
               ("rebase" "@{upstream}")
+              ("Autosync-Git: pulled \"%s\" (%s)"
+               "/dir" rebase)
               (autosync-git-after-pull-hook))
             call-recorder))))
 
@@ -212,11 +221,14 @@ synchronously calls the done callback with exit code 0."
             ((symbol-function 'autosync-git--probe-clean-p) (always-return t))
             ((symbol-function 'run-hooks) (record-only-and-return
                                            t
-                                           '((autosync-git-after-pull-hook)))))
+                                           '((autosync-git-after-pull-hook))))
+            ((symbol-function 'message) (record-calls-and-return nil)))
     (autosync-git-pull "/dir")
     (should
      (equal '(("fetch")
               ("merge")
+              ("Autosync-Git: pulled \"%s\" (%s)"
+               "/dir" merge)
               (autosync-git-after-pull-hook))
             call-recorder))))
 
@@ -321,15 +333,20 @@ synchronously calls the done callback with exit code 0."
             ((symbol-function 'autosync-git--needs-push-p) (always-return t))
             ((symbol-function 'run-hooks) (record-only-and-return
                                            t
-                                           '((autosync-git-after-pull-hook)))))
+                                           '((autosync-git-after-pull-hook))))
+            ((symbol-function 'message) (record-calls-and-return nil)))
     (autosync-git-sync "/dir")
     (should
      (equal '(("fetch")
               ("merge" "--ff-only")
+              ("Autosync-Git: pulled \"%s\" (fast-forward)"
+               "/dir")
               (autosync-git-after-pull-hook)
               ("add" "-A")
               ("commit" "-a" "-m" "Automated commit by autosync-git")
-              ("push"))
+              ("push")
+              ("Autosync-Git: pushed \"%s\""
+               "/dir"))
             call-recorder))))
 
 (ert-deftest autosync-git-sync--in-sync-no-op ()
@@ -373,7 +390,7 @@ synchronously calls the done callback with exit code 0."
 (ert-deftest autosync-git--alist-claims-mode-p--positive ()
   (should (autosync-git--alist-claims-mode-p
            '((nil . ((autosync-git-commit-message . "X")
-                    (mode . autosync-git)))))))
+                     (mode . autosync-git)))))))
 
 (ert-deftest autosync-git--alist-claims-mode-p--negative ()
   (should-not (autosync-git--alist-claims-mode-p
