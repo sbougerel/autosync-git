@@ -149,8 +149,9 @@
 ;; against tooling that misapplies dir-locals across buffers.  Override with
 ;; `autosync-git-skip-dir-locals-check'.
 ;;
-;; Variable rename: `autosync-magit-*' variables are now `autosync-git-*'.  The
-;; `autosync-magit-*' symbol remains as an obsolete alias.
+;; Rename.  `autosync-magit-*' mode and variables are now `autosync-git-*'.
+;; `autosync-magit-*' symbols remains as aliases; this makes `autosync-git'
+;; conflict with `autosync-magit'.
 ;;
 ;; 0.5.0 - Fixed a bug, added several improvements.
 ;;
@@ -197,6 +198,7 @@
   "Automatically synchronize a git repository with its upstream."
   :group 'tools)
 
+;;;###autoload
 (define-obsolete-variable-alias
   'autosync-magit-pull-interval
   'autosync-git-pull-interval
@@ -212,6 +214,7 @@ so that they never run closer than this interval apart."
   :group 'autosync-git
   :package-version '(autosync-git . "0.1.0"))
 
+;;;###autoload
 (define-obsolete-variable-alias
   'autosync-magit-pull-timer
   'autosync-git-pull-timer
@@ -230,6 +233,7 @@ activations in the same repository update that value."
   :group 'autosync-git
   :package-version '(autosync-git . "0.4.0"))
 
+;;;###autoload
 (define-obsolete-variable-alias
   'autosync-magit-pull-debounce
   'autosync-git-pull-debounce
@@ -245,6 +249,7 @@ Set this in `.dir-locals.el' for per-repository tuning."
   :group 'autosync-git
   :package-version '(autosync-git . "0.1.0"))
 
+;;;###autoload
 (define-obsolete-variable-alias
   'autosync-magit-commit-message
   'autosync-git-commit-message
@@ -744,6 +749,9 @@ multiply the timer count."
       (run-with-timer autosync-git-push-debounce nil
                       #'autosync-git-push
                       repo-dir autosync-git-commit-message))))
+
+;;;###autoload
+(define-obsolete-function-alias 'autosync-magit-mode 'autosync-git-mode "1.0.0")
 
 ;;;###autoload
 (define-minor-mode autosync-git-mode

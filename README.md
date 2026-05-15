@@ -130,8 +130,9 @@ programmatically unless `.dir-locals.el` explicitly claims the mode, guarding
 against tooling that misapplies dir-locals across buffers.  Override with
 `autosync-git-skip-dir-locals-check`.
 
-Variable rename: `autosync-magit-*` variables are now `autosync-git-*`.  The
-`autosync-magit-*` symbol remains as an obsolete alias.
+Rename.  `autosync-magit-*` mode and variables are now `autosync-git-*`.
+`autosync-magit-*` symbols remains as aliases; this makes `autosync-git`
+conflict with `autosync-magit`.
 
 0.5.0 - Fixed a bug, added several improvements.
 
