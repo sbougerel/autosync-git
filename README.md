@@ -125,14 +125,13 @@ merge cleanly, the operation runs (rebase by default, configurable via
 tree is left untouched.  A prefix arg skips the probe and runs the operation
 unconditionally.
 
-Defensive activation.  `autosync-git-mode` now refuses to activate unless
-`.dir-locals.el` explicitly claims the mode, guarding against tooling that
-misapplies dir-locals across buffers.  Override with
+Defensive activation.  `autosync-git-mode` now refuses to activate
+programmatically unless `.dir-locals.el` explicitly claims the mode, guarding
+against tooling that misapplies dir-locals across buffers.  Override with
 `autosync-git-skip-dir-locals-check`.
 
-Variable rename: `autosync-magit-after-merge-hook` is now
-`autosync-git-after-pull-hook`.  The `autosync-magit-after-merge-hook` symbol
-remains as an obsolete alias.
+Variable rename: `autosync-magit-*` variables are now `autosync-git-*`.  The
+`autosync-magit-*` symbol remains as an obsolete alias.
 
 0.5.0 - Fixed a bug, added several improvements.
 

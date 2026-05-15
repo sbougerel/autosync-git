@@ -144,14 +144,13 @@
 ;; tree is left untouched.  A prefix arg skips the probe and runs the operation
 ;; unconditionally.
 ;;
-;; Defensive activation.  `autosync-git-mode' now refuses to activate unless
-;; `.dir-locals.el' explicitly claims the mode, guarding against tooling that
-;; misapplies dir-locals across buffers.  Override with
+;; Defensive activation.  `autosync-git-mode' now refuses to activate
+;; programmatically unless `.dir-locals.el' explicitly claims the mode, guarding
+;; against tooling that misapplies dir-locals across buffers.  Override with
 ;; `autosync-git-skip-dir-locals-check'.
 ;;
-;; Variable rename: `autosync-magit-after-merge-hook' is now
-;; `autosync-git-after-pull-hook'.  The `autosync-magit-after-merge-hook' symbol
-;; remains as an obsolete alias.
+;; Variable rename: `autosync-magit-*' variables are now `autosync-git-*'.  The
+;; `autosync-magit-*' symbol remains as an obsolete alias.
 ;;
 ;; 0.5.0 - Fixed a bug, added several improvements.
 ;;
@@ -198,6 +197,11 @@
   "Automatically synchronize a git repository with its upstream."
   :group 'tools)
 
+(define-obsolete-variable-alias
+  'autosync-magit-pull-interval
+  'autosync-git-pull-interval
+  "1.0.0")
+
 ;;;###autoload(put 'autosync-git-pull-interval 'safe-local-variable 'integerp)
 (defcustom autosync-git-pull-interval 10
   "Minimum seconds between two pull attempts in the same repository.
@@ -207,6 +211,11 @@ so that they never run closer than this interval apart."
   :type 'integer
   :group 'autosync-git
   :package-version '(autosync-git . "0.1.0"))
+
+(define-obsolete-variable-alias
+  'autosync-magit-pull-timer
+  'autosync-git-pull-timer
+  "1.0.0")
 
 ;;;###autoload(put 'autosync-git-pull-timer 'safe-local-variable 'integerp)
 (defcustom autosync-git-pull-timer 300
@@ -221,6 +230,11 @@ activations in the same repository update that value."
   :group 'autosync-git
   :package-version '(autosync-git . "0.4.0"))
 
+(define-obsolete-variable-alias
+  'autosync-magit-pull-debounce
+  'autosync-git-pull-debounce
+  "1.0.0")
+
 ;;;###autoload(put 'autosync-git-push-debounce 'safe-local-variable 'integerp)
 (defcustom autosync-git-push-debounce 5
   "Seconds to wait after a buffer save before pushing to the remote.
@@ -230,6 +244,11 @@ Set this in `.dir-locals.el' for per-repository tuning."
   :type 'integer
   :group 'autosync-git
   :package-version '(autosync-git . "0.1.0"))
+
+(define-obsolete-variable-alias
+  'autosync-magit-commit-message
+  'autosync-git-commit-message
+  "1.0.0")
 
 ;;;###autoload(put 'autosync-git-commit-message 'safe-local-variable 'stringp)
 (defcustom autosync-git-commit-message "Automated commit by autosync-git"
